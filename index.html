@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradeVision AI — Smart Market Analysis</title>
+  <meta name="description" content="AI-powered forex, crypto & stock market analyzer with chart pattern recognition, support/resistance detection, and smart trading signals." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/styles/main.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 32 32" fill="none">
+            <path d="M4 24L10 14L16 18L22 8L28 12" stroke="url(#grad1)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="grad1" x1="4" y1="24" x2="28" y2="8">
+                <stop offset="0%" stop-color="#7c3aed"/>
+                <stop offset="100%" stop-color="#a78bfa"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <span class="brand-name">TradeVision<span class="brand-ai">AI</span></span>
+      </div>
+
+      <div class="nav-section">
+        <span class="nav-label">MAIN</span>
+        <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" data-page="chart-analysis" id="nav-chart-analysis">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4h-4z"/></svg>
+          <span>Chart Analysis</span>
+        </a>
+        <a href="#" class="nav-item" data-page="markets" id="nav-markets">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/><polyline points="16,7 22,7 22,13"/></svg>
+          <span>Live Markets</span>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <span class="nav-label">TOOLS</span>
+        <a href="#" class="nav-item" data-page="signals" id="nav-signals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg>
+          <span>Trade Signals</span>
+        </a>
+        <a href="#" class="nav-item" data-page="ai-insights" id="nav-ai-insights">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span>AI Insights</span>
+        </a>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="api-status" id="api-status">
+          <div class="api-dot connected"></div>
+          <span>AI Engine Ready</span>
+        </div>
+        <button class="settings-btn" id="settings-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span>Settings</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content" class="main-content">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <button class="menu-toggle" id="menu-toggle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="topbar-title">
+          <h1 id="page-title">Dashboard</h1>
+          <span class="topbar-subtitle" id="page-subtitle">AI-Powered Market Overview</span>
+        </div>
+        <div class="topbar-actions">
+          <div class="search-box" id="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Search markets..." id="search-input" />
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Container -->
+      <div class="page-container" id="page-container">
+        <!-- Pages will be rendered here by JS -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="modal-close" id="settings-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- AI Engine Toggle -->
+        <div class="setting-group" style="margin-bottom:24px;">
+          <label style="font-size:0.95rem;font-weight:700;color:var(--gray-800);margin-bottom:8px;display:block;">AI Analysis Engine</label>
+          <p class="setting-desc" style="margin-bottom:14px;">Choose which AI engine powers your analysis. The built-in engine works offline with no API key needed.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn engine-toggle-btn active" id="engine-builtin" style="flex:1;min-width:140px;padding:14px 16px;border-radius:var(--radius-md);font-size:0.85rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;">
+              <span style="font-size:1.3rem;">🧠</span>
+              <span>Built-in AI Engine</span>
+              <span style="font-size:0.72rem;font-weight:400;opacity:0.7;">No API key needed • Instant</span>
+            </button>
+            <button class="btn btn-outline engine-toggle-btn" id="engine-gemini" style="flex:1;min-width:140px;padding:14px 16px;border-radius:var(--radius-md);font-size:0.85rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;">
+              <span style="font-size:1.3rem;">🌐</span>
+              <span>Google Gemini API</span>
+              <span style="font-size:0.72rem;font-weight:400;opacity:0.7;">Requires API key • Cloud</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Gemini API Key (shown when Gemini is selected) -->
+        <div class="setting-group" id="gemini-key-section" style="display:none;">
+          <label for="gemini-api-key">Google Gemini API Key</label>
+          <p class="setting-desc">Get your free key at <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>. Note: Free tier has usage limits.</p>
+          <div class="input-row">
+            <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key..." />
+            <button class="btn btn-primary" id="save-api-key">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
