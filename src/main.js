@@ -11,6 +11,9 @@ import { renderHistory } from './pages/history.js';
 import { renderRiskManager } from './pages/riskManager.js';
 import { renderTradeJournal } from './pages/tradeJournal.js';
 import { renderModelTracker } from './pages/modelTracker.js';
+import { renderTradingKnowledge } from './pages/tradingKnowledge.js';
+import { renderLogin } from './pages/login.js';
+import { renderSecret } from './pages/secret.js';
 import { showToast, initToasts } from './utils/toast.js';
 import { getApiKey, setApiKey, hasApiKey } from './utils/storage.js';
 import { setUseBuiltIn, getUseBuiltIn } from './utils/gemini.js';
@@ -36,6 +39,7 @@ function initNavigation() {
 }
 
 function navigateTo(page) {
+  window.navigateTo = navigateTo; // Expose globally for login page
   currentPage = page;
   
   // Update active nav
@@ -53,7 +57,10 @@ function navigateTo(page) {
     'history': ['Database Backups', 'Your Saved Chart Analyses'],
     'risk-manager': ['Risk Manager', 'Position Sizing & Risk Control'],
     'trade-journal': ['Trade Journal', 'Log, Track & Analyze Your Trades'],
-    'model-tracker': ['Model Tracker', 'AI Model Performance & Metrics']
+    'model-tracker': ['Model Tracker', 'AI Model Performance & Metrics'],
+    'trading-knowledge': ['Trading Knowledge', 'Dashboard / Trading Knowledge'],
+    'login': ['Login', ''],
+    'secret': ['Secret Admin', 'Hidden Admin Area']
   };
 
   const [title, subtitle] = titles[page] || ['Dashboard', ''];
@@ -66,6 +73,20 @@ function navigateTo(page) {
   container.offsetHeight; // force reflow
   container.style.animation = 'fadeIn 0.4s ease';
 
+  // Toggle layout for login page
+  const sidebar = document.getElementById('sidebar');
+  const topbar = document.querySelector('.topbar');
+  const mainContent = document.getElementById('main-content');
+  if (page === 'login') {
+    sidebar.style.display = 'none';
+    topbar.style.display = 'none';
+    mainContent.style.marginLeft = '0';
+  } else {
+    sidebar.style.display = 'flex';
+    topbar.style.display = 'flex';
+    mainContent.style.marginLeft = 'var(--sidebar-width)';
+  }
+
   switch (page) {
     case 'dashboard': renderDashboard(container); break;
     case 'chart-analysis': renderChartAnalysis(container); break;
@@ -76,6 +97,9 @@ function navigateTo(page) {
     case 'risk-manager': renderRiskManager(container); break;
     case 'trade-journal': renderTradeJournal(container); break;
     case 'model-tracker': renderModelTracker(container); break;
+    case 'trading-knowledge': renderTradingKnowledge(container); break;
+    case 'login': renderLogin(container); break;
+    case 'secret': renderSecret(container); break;
   }
 
   // Close sidebar on mobile
@@ -204,6 +228,15 @@ function init() {
   initSettings();
   initMobileMenu();
   updateApiStatus();
+
+  // Logo Login functionality
+  const logo = document.getElementById('brand-logo');
+  if (logo) {
+    logo.addEventListener('click', () => {
+      navigateTo('login');
+    });
+  }
+
   navigateTo('dashboard');
 }
 

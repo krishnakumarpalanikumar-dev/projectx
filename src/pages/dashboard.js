@@ -1,6 +1,10 @@
 // Dashboard Page
 
+import { getAnalysisHistory } from '../utils/storage.js';
+
 export function renderDashboard(container) {
+  const chartsCount = getAnalysisHistory().length;
+
   container.innerHTML = `
     <!-- Hero Stats -->
     <div class="stats-grid">
@@ -10,7 +14,7 @@ export function renderDashboard(container) {
         </div>
         <div class="stat-info">
           <h3>Charts Analyzed</h3>
-          <div class="stat-value" id="stat-charts">0</div>
+          <div class="stat-value" id="stat-charts">${chartsCount}</div>
           <span class="stat-change up">↑ AI Powered</span>
         </div>
       </div>
