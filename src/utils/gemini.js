@@ -34,11 +34,11 @@ export function getUseBuiltIn() {
 // ============================================
 // Chart Analysis — Smart routing
 // ============================================
-export async function analyzeChart(imageBase64, mimeType, pair, timeframe) {
+export async function analyzeChart(imageBase64, mimeType, pair, timeframe, currentPrice = null) {
   // Always use built-in engine (works without API key)
   if (!shouldUseGemini()) {
     console.log('🧠 Using TradeVision Built-in AI Engine');
-    return await engineAnalyzeChart(imageBase64, mimeType, pair, timeframe);
+    return await engineAnalyzeChart(imageBase64, mimeType, pair, timeframe, currentPrice);
   }
 
   // Optional: Try Gemini API
@@ -47,7 +47,7 @@ export async function analyzeChart(imageBase64, mimeType, pair, timeframe) {
     return await geminiAnalyzeChart(imageBase64, mimeType, pair, timeframe);
   } catch (error) {
     console.warn('⚠️ Gemini API failed, falling back to built-in engine:', error.message);
-    return await engineAnalyzeChart(imageBase64, mimeType, pair, timeframe);
+    return await engineAnalyzeChart(imageBase64, mimeType, pair, timeframe, currentPrice);
   }
 }
 

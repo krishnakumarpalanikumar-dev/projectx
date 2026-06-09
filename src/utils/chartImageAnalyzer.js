@@ -5,6 +5,27 @@
 // ============================================
 
 /**
+ * Converts RGB colors to HSL (Hue, Saturation, Lightness) for highly precise color detection
+ */
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; } 
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return [h * 360, s, l];
+}
+
+/**
  * Analyze a chart image using Canvas-based pixel analysis
  * Detects: dominant colors, trend direction, candle ratios, volatility
  */
@@ -26,14 +47,17 @@ export async function analyzeChartImage(imageBase64, mimeType) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const pixels = imageData.data;
         
+        const chartRegion = detectChartRegion(pixels, canvas.width, canvas.height);
+        
+        // 2. Perform localized analysis to increase accuracy
         const analysis = {
           dimensions: { width: canvas.width, height: canvas.height },
-          colors: analyzeColors(pixels, canvas.width, canvas.height),
-          trend: analyzeTrend(pixels, canvas.width, canvas.height),
-          volatility: analyzeVolatility(pixels, canvas.width, canvas.height),
-          candleRatio: analyzeCandleColors(pixels, canvas.width, canvas.height),
-          brightness: analyzeBrightness(pixels),
-          chartRegion: detectChartRegion(pixels, canvas.width, canvas.height)
+          chartRegion: chartRegion,
+          colors: analyzeColors(pixels, canvas.width, canvas.height, chartRegion),
+          trend: analyzeTrend(pixels, canvas.width, canvas.height, chartRegion),
+          volatility: analyzeVolatility(pixels, canvas.width, canvas.height, chartRegion),
+          candleRatio: analyzeCandleColors(pixels, canvas.width, canvas.height, chartRegion),
+          brightness: analyzeBrightness(pixels)
         };
         
         resolve(analysis);
@@ -49,15 +73,15 @@ export async function analyzeChartImage(imageBase64, mimeType) {
 /**
  * Analyze dominant colors in the image
  */
-function analyzeColors(pixels, width, height) {
+function analyzeColors(pixels, width, height, region) {
   let greenCount = 0, redCount = 0, blueCount = 0, whiteCount = 0, darkCount = 0;
   let totalPixels = 0;
   
-  // Sample the center 60% of the image (where the chart typically is)
-  const startX = Math.floor(width * 0.15);
-  const endX = Math.floor(width * 0.85);
-  const startY = Math.floor(height * 0.1);
-  const endY = Math.floor(height * 0.85);
+  // Use dynamically detected chart region for more precision
+  const startX = Math.floor(width * (region ? Math.max(0.05, region.left) : 0.15));
+  const endX = Math.floor(width * (region ? Math.min(0.95, region.right) : 0.85));
+  const startY = Math.floor(height * (region ? Math.max(0.05, region.top) : 0.1));
+  const endY = Math.floor(height * (region ? Math.min(0.95, region.bottom) : 0.85));
   
   for (let y = startY; y < endY; y += 2) {
     for (let x = startX; x < endX; x += 2) {
@@ -65,16 +89,18 @@ function analyzeColors(pixels, width, height) {
       const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
       totalPixels++;
       
-      // Detect green candles / bullish elements
-      if (g > r * 1.3 && g > b * 1.2 && g > 80) greenCount++;
-      // Detect red candles / bearish elements
-      else if (r > g * 1.3 && r > b * 1.2 && r > 80) redCount++;
-      // Detect blue elements (indicators, lines)
-      else if (b > r * 1.3 && b > g * 1.2 && b > 80) blueCount++;
-      // White/light
-      else if (r > 200 && g > 200 && b > 200) whiteCount++;
-      // Dark/background
-      else if (r < 60 && g < 60 && b < 60) darkCount++;
+      const [h, s, l] = rgbToHsl(r, g, b);
+      
+      // More precise HSL-based color detection
+      if (s > 0.2 && l > 0.2 && l < 0.8) {
+        if (h > 80 && h < 160) greenCount++; // Green candles
+        else if (h > 330 || h < 25) redCount++; // Red candles
+        else if (h > 190 && h < 250) blueCount++; // Blue indicators
+      } else if (l > 0.8) {
+        whiteCount++; // Light backgrounds
+      } else if (l < 0.2) {
+        darkCount++; // Dark backgrounds
+      }
     }
   }
   
@@ -92,34 +118,35 @@ function analyzeColors(pixels, width, height) {
 /**
  * Analyze trend direction by scanning pixel brightness from left to right
  */
-function analyzeTrend(pixels, width, height) {
-  // Divide the chart into vertical columns and find the "center of mass" of non-background pixels
-  const columns = 20; // Divide into 20 segments
+function analyzeTrend(pixels, width, height, region) {
+  // Dive the chart into vertical columns
+  const columns = 30; // Increased granularity
   const colWidth = Math.floor(width / columns);
   const centerOfMass = [];
   
-  // Detect background color (most common at edges)
+  // Detect background color
   const bgColor = detectBackgroundColor(pixels, width, height);
+  
+  const startY = Math.floor(height * (region ? region.top : 0.1));
+  const endY = Math.floor(height * (region ? region.bottom : 0.85));
   
   for (let col = 0; col < columns; col++) {
     let totalWeight = 0;
     let weightedY = 0;
     
     for (let x = col * colWidth; x < (col + 1) * colWidth && x < width; x += 2) {
-      for (let y = Math.floor(height * 0.1); y < Math.floor(height * 0.85); y++) {
+      for (let y = startY; y < endY; y++) {
         const i = (y * width + x) * 4;
         const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
         
-        // Check if this pixel is "interesting" (not background)
         const diffR = Math.abs(r - bgColor.r);
         const diffG = Math.abs(g - bgColor.g);
         const diffB = Math.abs(b - bgColor.b);
         const colorDiff = diffR + diffG + diffB;
         
-        if (colorDiff > 80) { // Significant color difference from background
-          const weight = colorDiff / 765; // Normalize
+        if (colorDiff > 80) { 
+          const weight = colorDiff / 765;
           totalWeight += weight;
-          // Invert Y because in charts, up = lower Y coordinate
           weightedY += (height - y) * weight;
         }
       }
@@ -128,14 +155,19 @@ function analyzeTrend(pixels, width, height) {
     centerOfMass.push(totalWeight > 0 ? weightedY / totalWeight : height / 2);
   }
   
-  // Calculate trend from center of mass positions
-  const firstThird = centerOfMass.slice(0, 7).reduce((a, b) => a + b, 0) / 7;
-  const lastThird = centerOfMass.slice(13).reduce((a, b) => a + b, 0) / 7;
-  const middleThird = centerOfMass.slice(7, 13).reduce((a, b) => a + b, 0) / 6;
+  // High-precision linear regression for trend slope
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  const n = centerOfMass.length;
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += centerOfMass[i];
+    sumXY += i * centerOfMass[i];
+    sumX2 += i * i;
+  }
   
-  const trendSlope = (lastThird - firstThird) / firstThird;
+  const regressionSlope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const trendSlope = regressionSlope / (height / columns);
   
-  // Calculate volatility from center of mass changes
   let maxSwing = 0;
   for (let i = 1; i < centerOfMass.length; i++) {
     maxSwing = Math.max(maxSwing, Math.abs(centerOfMass[i] - centerOfMass[i - 1]));
@@ -146,14 +178,18 @@ function analyzeTrend(pixels, width, height) {
   else if (trendSlope < -0.08) { direction = 'bearish'; strength = trendSlope < -0.2 ? 'strong' : 'moderate'; }
   else { direction = 'sideways'; strength = 'weak'; }
   
+  const firstThirdAvg = centerOfMass.slice(0, Math.floor(n/3)).reduce((a, b) => a + b, 0) / Math.floor(n/3);
+  const middleThirdAvg = centerOfMass.slice(Math.floor(n/3), Math.floor(n*2/3)).reduce((a, b) => a + b, 0) / Math.floor(n/3);
+  const lastThirdAvg = centerOfMass.slice(Math.floor(n*2/3)).reduce((a, b) => a + b, 0) / (n - Math.floor(n*2/3));
+  
   return {
     direction,
     strength,
     slope: trendSlope,
     positions: centerOfMass,
-    firstThirdAvg: firstThird,
-    middleThirdAvg: middleThird,
-    lastThirdAvg: lastThird,
+    firstThirdAvg: firstThirdAvg,
+    middleThirdAvg: middleThirdAvg,
+    lastThirdAvg: lastThirdAvg,
     maxSwing
   };
 }
@@ -161,27 +197,28 @@ function analyzeTrend(pixels, width, height) {
 /**
  * Analyze price volatility from pixel distribution
  */
-function analyzeVolatility(pixels, width, height) {
-  // Look at the vertical spread of non-background pixels across the chart
+function analyzeVolatility(pixels, width, height, region) {
   const bgColor = detectBackgroundColor(pixels, width, height);
   const columns = 10;
   const colWidth = Math.floor(width / columns);
   const ranges = [];
   
+  const startY = Math.floor(height * (region ? region.top : 0.1));
+  const endY = Math.floor(height * (region ? region.bottom : 0.85));
+  
   for (let col = 0; col < columns; col++) {
     let minY = height, maxY = 0;
     
     for (let x = col * colWidth; x < (col + 1) * colWidth && x < width; x += 3) {
-      for (let y = Math.floor(height * 0.1); y < Math.floor(height * 0.85); y++) {
+      for (let y = startY; y < endY; y++) {
         const i = (y * width + x) * 4;
         const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
         
-        const diffR = Math.abs(r - bgColor.r);
-        const diffG = Math.abs(g - bgColor.g);
-        const diffB = Math.abs(b - bgColor.b);
-        
-        if (diffR + diffG + diffB > 100) {
-          if ((r > g * 1.2 && r > 80) || (g > r * 1.2 && g > 80)) { // candle-like colors
+        const diff = Math.abs(r - bgColor.r) + Math.abs(g - bgColor.g) + Math.abs(b - bgColor.b);
+        if (diff > 100) {
+          const [h, s, l] = rgbToHsl(r, g, b);
+          // Only map boundaries using saturated colors (candles, lines) to ignore noise
+          if (s > 0.2 && l > 0.2 && l < 0.8) {
             minY = Math.min(minY, y);
             maxY = Math.max(maxY, y);
           }
@@ -209,24 +246,27 @@ function analyzeVolatility(pixels, width, height) {
 /**
  * Count green vs red candle pixels
  */
-function analyzeCandleColors(pixels, width, height) {
+function analyzeCandleColors(pixels, width, height, region) {
   let greenPixels = 0, redPixels = 0;
   
-  // Focus on the main chart area
-  const startX = Math.floor(width * 0.1);
-  const endX = Math.floor(width * 0.9);
-  const startY = Math.floor(height * 0.1);
-  const endY = Math.floor(height * 0.85);
+  // Use precise region
+  const startX = Math.floor(width * (region ? region.left : 0.1));
+  const endX = Math.floor(width * (region ? region.right : 0.9));
+  const startY = Math.floor(height * (region ? region.top : 0.1));
+  const endY = Math.floor(height * (region ? region.bottom : 0.85));
   
   for (let y = startY; y < endY; y += 2) {
     for (let x = startX; x < endX; x += 2) {
       const i = (y * width + x) * 4;
       const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
       
-      // Green candle detection (various shades)
-      if (g > r * 1.2 && g > 60 && g > b) greenPixels++;
-      // Red candle detection (various shades)
-      else if (r > g * 1.2 && r > 60 && r > b) redPixels++;
+      const [h, s, l] = rgbToHsl(r, g, b);
+      
+      // HSL color bound filter for precision mapping
+      if (s > 0.25 && l > 0.15 && l < 0.85) {
+        if (h > 70 && h < 160) greenPixels++;
+        else if (h > 330 || h < 25) redPixels++;
+      }
     }
   }
   

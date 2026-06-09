@@ -3,10 +3,54 @@
 import { analyzeChart } from '../utils/gemini.js';
 import { showToast } from '../utils/toast.js';
 import { processMessage, setChatAnalysis, clearChatHistory } from '../utils/chatbot.js';
+import { saveAnalysisToHistory } from '../utils/storage.js';
 
 let uploadedImage = null;
 let uploadedMimeType = null;
 let lastAnalysis = null;
+
+// ─── Session State Persistence ──────────────────────────────────────────────
+const SESSION_KEY = 'chartAnalysisState';
+
+function saveSessionState() {
+  try {
+    const state = {
+      uploadedImage,
+      uploadedMimeType,
+      lastAnalysis,
+      config: {
+        marketType: document.getElementById('market-type')?.value,
+        pair: document.getElementById('pair-input')?.value,
+        currentPrice: document.getElementById('current-price')?.value,
+        timeframe: document.getElementById('timeframe-select')?.value,
+        balance: document.getElementById('account-balance')?.value,
+        risk: document.getElementById('risk-percent')?.value,
+        depth: document.getElementById('analysis-depth')?.value,
+      },
+      chatHTML: document.getElementById('chatbot-messages')?.innerHTML,
+      resultsHTML: document.getElementById('analysis-results-container')?.innerHTML,
+      uploadZoneHTML: document.getElementById('upload-zone')?.innerHTML,
+      uploadZoneHasImage: document.getElementById('upload-zone')?.classList.contains('has-image'),
+    };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+  } catch (e) {
+    // Storage quota exceeded or serialisation error — silently ignore
+    console.warn('Could not save chart analysis state:', e);
+  }
+}
+
+function loadSessionState() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearSessionState() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
 
 export function renderChartAnalysis(container) {
   container.innerHTML = `
@@ -19,6 +63,9 @@ export function renderChartAnalysis(container) {
             <span class="card-badge badge-purple">AI Vision</span>
           </div>
           
+          <!-- Persistent file input — lives OUTSIDE zone so zone.innerHTML resets never destroy it -->
+          <input type="file" id="chart-file-input" accept="image/*" style="display:none;" />
+
           <div class="upload-zone" id="upload-zone">
             <div class="upload-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -33,7 +80,6 @@ export function renderChartAnalysis(container) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Browse Files
             </button>
-            <input type="file" id="chart-file-input" accept="image/*" style="display:none;" />
           </div>
         </div>
 
@@ -54,6 +100,15 @@ export function renderChartAnalysis(container) {
             <div class="form-group">
               <label for="pair-input">Trading Pair</label>
               <input type="text" id="pair-input" placeholder="e.g., EUR/USD, BTC/USDT, AAPL" />
+            </div>
+            <div class="form-group">
+              <label for="current-price" style="display:flex;align-items:center;gap:6px;">
+                Current Market Price
+                <span style="font-size:0.72rem;font-weight:500;background:var(--purple-100);color:var(--purple-600);padding:2px 7px;border-radius:20px;">Live</span>
+              </label>
+              <input type="number" id="current-price" placeholder="e.g., 4614.399" step="any" min="0"
+                style="border:1.5px solid var(--purple-200);" />
+              <span style="font-size:0.74rem;color:var(--gray-400);margin-top:4px;display:block;">Enter the exact price shown on your chart for accurate signals</span>
             </div>
             <div class="form-group">
               <label for="timeframe-select">Timeframe</label>
@@ -98,13 +153,33 @@ export function renderChartAnalysis(container) {
           </div>
         </div>
 
+        <!-- AI Chatbot has been moved to right column -->
+      </div>
+
+      <!-- Right Column: Results & Chatbot -->
+      <div class="chart-right-col">
+        <!-- Results Container -->
+        <div id="analysis-results-container">
+          <div class="card">
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 12V7H5a2 2 0 010-4h14v4"/>
+                <path d="M3 5v14a2 2 0 002 2h16v-5"/>
+                <path d="M18 12a2 2 0 000 4h4v-4h-4z"/>
+              </svg>
+              <h3>No Analysis Yet</h3>
+              <p>Upload a chart screenshot, configure your parameters, and click "Analyze with AI" to get started.</p>
+            </div>
+          </div>
+        </div>
+        
         <!-- AI Chatbot -->
-        <div class="card chatbot-card">
+        <div class="card chatbot-card" style="margin-top:20px; display:flex; flex-direction:column; max-height: 500px;">
           <div class="card-header">
             <span class="card-title">🤖 AI Trading Assistant</span>
             <button class="btn btn-outline" id="clear-chat-btn" style="padding:4px 12px;font-size:0.72rem;">Clear</button>
           </div>
-          <div class="chatbot-messages" id="chatbot-messages">
+          <div class="chatbot-messages" id="chatbot-messages" style="flex:1; overflow-y:auto; padding:16px;">
             <div class="chat-msg assistant">
               <div class="chat-avatar">🤖</div>
               <div class="chat-bubble">
@@ -114,26 +189,11 @@ export function renderChartAnalysis(container) {
               </div>
             </div>
           </div>
-          <div class="chatbot-input-area">
-            <input type="text" id="chatbot-input" placeholder="Ask about the chart, indicators, risk management..." />
-            <button class="chatbot-send-btn" id="chatbot-send-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <div class="chatbot-input-area" style="border-top:1px solid var(--purple-100); padding:16px; display:flex; gap:10px;">
+            <input type="text" id="chatbot-input" placeholder="Ask about the chart, indicators, risk management..." style="flex:1; padding:12px; border-radius:var(--radius-md); border:1px solid var(--gray-200); outline:none;"/>
+            <button class="chatbot-send-btn" id="chatbot-send-btn" style="background:var(--purple-600); color:white; width:48px; height:48px; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Column: Results -->
-      <div class="chart-right-col" id="analysis-results-container">
-        <div class="card">
-          <div class="empty-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 12V7H5a2 2 0 010-4h14v4"/>
-              <path d="M3 5v14a2 2 0 002 2h16v-5"/>
-              <path d="M18 12a2 2 0 000 4h4v-4h-4z"/>
-            </svg>
-            <h3>No Analysis Yet</h3>
-            <p>Upload a chart screenshot, configure your parameters, and click "Analyze with AI" to get started.</p>
           </div>
         </div>
       </div>
@@ -143,16 +203,90 @@ export function renderChartAnalysis(container) {
   initUpload();
   initAnalysis();
   initChatbot();
+  restoreSessionState();
+}
+
+// ─── Restore persisted state after DOM is ready ──────────────────────────────
+function restoreSessionState() {
+  const state = loadSessionState();
+  if (!state) return;
+
+  // Restore in-memory variables
+  uploadedImage = state.uploadedImage || null;
+  uploadedMimeType = state.uploadedMimeType || null;
+  lastAnalysis = state.lastAnalysis || null;
+
+  // Restore analysis context in chatbot
+  if (lastAnalysis) setChatAnalysis(lastAnalysis);
+
+  // Restore config dropdowns / inputs
+  if (state.config) {
+    const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+    set('market-type', state.config.marketType);
+    set('pair-input', state.config.pair);
+    set('current-price', state.config.currentPrice);
+    set('timeframe-select', state.config.timeframe);
+    set('account-balance', state.config.balance);
+    set('risk-percent', state.config.risk);
+    set('analysis-depth', state.config.depth);
+  }
+
+  // Restore upload zone
+  if (state.uploadZoneHTML) {
+    const zone = document.getElementById('upload-zone');
+    if (zone) {
+      zone.innerHTML = state.uploadZoneHTML;
+      if (state.uploadZoneHasImage) zone.classList.add('has-image');
+      // Re-wire the "click to change image" link
+      zone.querySelector('#change-image')?.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        document.getElementById('chart-file-input').click();
+      });
+    }
+  }
+
+  // Re-enable analyse button if image is present
+  if (uploadedImage) {
+    const btn = document.getElementById('analyze-btn');
+    if (btn) btn.disabled = false;
+  }
+
+  // Restore analysis results panel
+  if (state.resultsHTML) {
+    const rc = document.getElementById('analysis-results-container');
+    if (rc) rc.innerHTML = state.resultsHTML;
+  }
+
+  // Restore chat messages
+  if (state.chatHTML) {
+    const cm = document.getElementById('chatbot-messages');
+    if (cm) cm.innerHTML = state.chatHTML;
+    requestAnimationFrame(() => {
+      if (cm) cm.scrollTop = cm.scrollHeight;
+    });
+  }
 }
 
 function initUpload() {
   const zone = document.getElementById('upload-zone');
   const fileInput = document.getElementById('chart-file-input');
 
-  zone.addEventListener('click', () => fileInput.click());
+  // Click on empty zone → open file picker
+  zone.addEventListener('click', (e) => {
+    // If "Click to change image" span was clicked, open picker (stopPropagation keeps it clean)
+    if (e.target.id === 'change-image') {
+      fileInput.click();
+      return;
+    }
+    // Open picker when zone has no image yet (blank state / browse-files button)
+    if (!zone.classList.contains('has-image')) fileInput.click();
+  });
 
+  // Single persistent listener — input is never removed from the DOM
   fileInput.addEventListener('change', (e) => {
     if (e.target.files[0]) handleFile(e.target.files[0]);
+    // Reset value so the same file can be re-selected
+    fileInput.value = '';
   });
 
   zone.addEventListener('dragover', (e) => {
@@ -191,21 +325,19 @@ function handleFile(file) {
 
     const zone = document.getElementById('upload-zone');
     zone.classList.add('has-image');
+    // Note: file input lives OUTSIDE zone — safe to replace innerHTML freely
     zone.innerHTML = `
       <img src="${base64Full}" class="upload-preview" alt="Chart preview" />
       <p style="margin-top:12px;font-size:0.82rem;color:var(--gray-500);">
         <strong>${file.name}</strong> • ${(file.size / 1024).toFixed(1)} KB
-        <br><span style="color:var(--purple-600);cursor:pointer;" id="change-image">Click to change image</span>
+        <br><span style="color:var(--purple-600);cursor:pointer;text-decoration:underline;" id="change-image">Click to change image</span>
       </p>
     `;
-
-    document.getElementById('change-image')?.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      document.getElementById('chart-file-input').click();
-    });
+    // No need to re-attach listener — the zone click handler already handles #change-image
 
     document.getElementById('analyze-btn').disabled = false;
     showToast('Chart uploaded successfully!', 'success');
+    saveSessionState();
   };
   reader.readAsDataURL(file);
 }
@@ -221,6 +353,8 @@ function initAnalysis() {
 
     const pair = document.getElementById('pair-input').value.trim();
     const timeframe = document.getElementById('timeframe-select').value;
+    const currentPriceRaw = document.getElementById('current-price').value.trim();
+    const currentPrice = currentPriceRaw ? parseFloat(currentPriceRaw) : null;
 
     if (!pair) {
       showToast('Please enter the trading pair', 'error');
@@ -231,14 +365,21 @@ function initAnalysis() {
     analyzeBtn.innerHTML = '<div class="spinner"></div> Analyzing...';
 
     try {
-      const result = await analyzeChart(uploadedImage, uploadedMimeType, pair, timeframe);
+      const result = await analyzeChart(uploadedImage, uploadedMimeType, pair, timeframe, currentPrice);
       lastAnalysis = result;
       setChatAnalysis(result);
       displayResults(result, pair, timeframe);
-      showToast('Analysis complete!', 'success');
+      
+      // Save backup locally to History database
+      saveAnalysisToHistory(uploadedImage, uploadedMimeType, pair, timeframe, result);
+
+      showToast('Analysis complete & saved!', 'success');
 
       // Notify chatbot
       addChatMessage('assistant', `✅ Analysis complete for **${pair}** (${timeframe})!\n\nI detected a **${result.trend?.direction}** trend with **${result.trend?.strength}** strength. Signal: **${result.signals?.recommendation}**.\n\nAsk me anything — "Should I trade this?", "Where's the stop loss?", "Explain the patterns", etc.`);
+
+      // Persist state so navigating away and back restores everything
+      saveSessionState();
     } catch (error) {
       showToast(`Analysis failed: ${error.message}`, 'error');
       console.error('Analysis error:', error);
@@ -268,6 +409,7 @@ function initChatbot() {
     setTimeout(() => {
       const response = processMessage(text);
       addChatMessage('assistant', response);
+      saveSessionState(); // persist after every chat exchange
     }, 300 + Math.random() * 400);
   }
 
@@ -281,12 +423,55 @@ function initChatbot() {
 
   clearBtn.addEventListener('click', () => {
     clearChatHistory();
+    uploadedImage = null;
+    uploadedMimeType = null;
+    lastAnalysis = null;
+    clearSessionState();
+
+    // Reset upload zone — file input is outside zone so no re-wiring needed
+    const zone = document.getElementById('upload-zone');
+    if (zone) {
+      zone.classList.remove('has-image');
+      zone.innerHTML = `
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <h3 class="upload-title">Drop your chart here</h3>
+        <p class="upload-subtitle">Supports PNG, JPG, JPEG, WebP • Max 10MB</p>
+        <button class="upload-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Browse Files
+        </button>
+      `;
+    }
+
+    // Reset results
+    const rc = document.getElementById('analysis-results-container');
+    if (rc) rc.innerHTML = `
+      <div class="card">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4h-4z"/></svg>
+          <h3>No Analysis Yet</h3>
+          <p>Upload a chart screenshot, configure your parameters, and click "Analyze with AI" to get started.</p>
+        </div>
+      </div>
+    `;
+
+    // Disable analyse button
+    const btn = document.getElementById('analyze-btn');
+    if (btn) btn.disabled = true;
+
+    // Reset chat UI
     const container = document.getElementById('chatbot-messages');
-    container.innerHTML = `
+    if (container) container.innerHTML = `
       <div class="chat-msg assistant">
         <div class="chat-avatar">🤖</div>
         <div class="chat-bubble">
-          <p>Chat cleared! How can I help you? 📊</p>
+          <p>Everything cleared! Upload a new chart to start fresh. 📊</p>
         </div>
       </div>
     `;

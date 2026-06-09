@@ -7,6 +7,10 @@ import { renderChartAnalysis } from './pages/chartAnalysis.js';
 import { renderMarkets } from './pages/markets.js';
 import { renderSignals } from './pages/signals.js';
 import { renderAIInsights } from './pages/aiInsights.js';
+import { renderHistory } from './pages/history.js';
+import { renderRiskManager } from './pages/riskManager.js';
+import { renderTradeJournal } from './pages/tradeJournal.js';
+import { renderModelTracker } from './pages/modelTracker.js';
 import { showToast, initToasts } from './utils/toast.js';
 import { getApiKey, setApiKey, hasApiKey } from './utils/storage.js';
 import { setUseBuiltIn, getUseBuiltIn } from './utils/gemini.js';
@@ -45,7 +49,11 @@ function navigateTo(page) {
     'chart-analysis': ['Chart Analysis', 'Upload & Analyze Chart Patterns'],
     'markets': ['Live Markets', 'Real-Time Market Data'],
     'signals': ['Trade Signals', 'AI-Generated Trading Signals'],
-    'ai-insights': ['AI Insights', 'Smart Market Intelligence']
+    'ai-insights': ['AI Insights', 'Smart Market Intelligence'],
+    'history': ['Database Backups', 'Your Saved Chart Analyses'],
+    'risk-manager': ['Risk Manager', 'Position Sizing & Risk Control'],
+    'trade-journal': ['Trade Journal', 'Log, Track & Analyze Your Trades'],
+    'model-tracker': ['Model Tracker', 'AI Model Performance & Metrics']
   };
 
   const [title, subtitle] = titles[page] || ['Dashboard', ''];
@@ -64,6 +72,10 @@ function navigateTo(page) {
     case 'markets': renderMarkets(container); break;
     case 'signals': renderSignals(container); break;
     case 'ai-insights': renderAIInsights(container); break;
+    case 'history': renderHistory(container); break;
+    case 'risk-manager': renderRiskManager(container); break;
+    case 'trade-journal': renderTradeJournal(container); break;
+    case 'model-tracker': renderModelTracker(container); break;
   }
 
   // Close sidebar on mobile

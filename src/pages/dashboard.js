@@ -135,6 +135,7 @@ export function renderDashboard(container) {
         </div>
       </div>
     </div>
+
   `;
 
   // Quick action buttons

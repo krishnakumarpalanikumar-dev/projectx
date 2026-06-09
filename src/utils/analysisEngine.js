@@ -18,13 +18,13 @@ import {
 // ============================================
 // Chart Analysis (replaces Gemini Vision)
 // ============================================
-export async function analyzeChart(imageBase64, mimeType, pair, timeframe) {
+export async function analyzeChart(imageBase64, mimeType, pair, timeframe, currentPrice = null) {
   // Step 1: Analyze the actual chart image pixels
   const imageAnalysis = await analyzeChartImage(imageBase64, mimeType);
   
   // Step 2: Build analysis from image data + knowledge base
   const trend = determineTrend(imageAnalysis, pair, timeframe);
-  const sr = calculateSupportResistance(imageAnalysis, pair, timeframe);
+  const sr = calculateSupportResistance(imageAnalysis, pair, timeframe, currentPrice);
   const patterns = detectPatterns(imageAnalysis, trend);
   const signals = generateTradeSignals(imageAnalysis, trend, sr, pair, timeframe);
   const indicators = analyzeIndicators(imageAnalysis, trend);
@@ -69,20 +69,20 @@ export async function getMarketInsights(topic) {
   }
   
   const sentiments = [
-    'Markets are showing mixed signals with cautious optimism. Key economic data releases this week could shift sentiment significantly. Risk management remains crucial in current conditions.',
-    'Overall market sentiment leans cautiously bullish. Institutional flows suggest accumulation in select assets, while retail sentiment remains divided. Monitor central bank communications closely.',
-    'Markets exhibit heightened volatility amid uncertainty. Technical indicators suggest a potential inflection point. Traders should focus on risk-defined positions and avoid over-leveraging.',
-    'Consolidation dominates across major markets. The lack of clear directional bias suggests a breakout is imminent. Key support and resistance levels should be watched carefully for the next major move.',
-    'Risk appetite is improving gradually. The DXY (Dollar Index) movement is the key driver across forex and commodities. Correlation analysis suggests diversified positioning is advisable.',
-    'Bearish undertones persist as macro headwinds weigh on sentiment. However, oversold conditions in several assets present potential counter-trend opportunities for nimble traders.',
+    'Global macro conditions reflect a classic risk-off shift. Elevated yields are pressuring equities while safe-haven flows dominate FX and commodities. Market participants are aggressively repricing terminal rate expectations following recent inflation stickiness.',
+    'Risk assets are demonstrating remarkable resilience despite tightening liquidity. Technical structures remain constructive across major indices, though breadth divergence suggests caution. The volatility index (VIX) indicates complacency, leaving markets vulnerable to exogenous shocks.',
+    'We are observing a pronounced sector rotation driven by shifting macroeconomic narratives. Value and cyclical sectors are catching bids at the expense of mega-cap growth. Cross-asset correlations are breaking down, creating a favorable environment for alpha generation and tactical macro plays.',
+    'Consolidation phase continues across major asset classes. Order book data shows significant institutional supply stacked above current resistance levels. Directional bias remains neutral until a decisive breakout occurs, supported by a corresponding surge in relative volume.',
+    'The prevailing narrative is dominated by the "higher for longer" monetary policy stance. The US Dollar Index (DXY) continues its upward trajectory, exerting secular pressure on emerging market currencies and non-yielding assets like Gold. Traders should adopt a defensive posture.',
+    'A structural shift in market sentiment is underway, fueled by systemic liquidity injections and favorable earnings surprises. Momentum indicators across crypto and equities are heavily overbought, but the absence of bearish divergence suggests the trend has further room to run.'
   ];
   
   const keyEventSets = [
-    ['Federal Reserve Interest Rate Decision', 'US Non-Farm Payrolls Report', 'ECB Monetary Policy Meeting', 'UK CPI Inflation Data'],
-    ['US CPI Inflation Report', 'Bank of Japan Policy Decision', 'Eurozone GDP Data', 'US Retail Sales Report'],
-    ['FOMC Meeting Minutes Release', 'Chinese Trade Balance Data', 'UK Employment Report', 'US Producer Price Index'],
-    ['G20 Summit Outcomes', 'US Consumer Confidence Data', 'Eurozone PMI Reports', 'RBA Interest Rate Decision'],
-    ['US Durable Goods Orders', 'Bank of England Rate Decision', 'Japanese CPI Data', 'US Existing Home Sales'],
+    ['US CPI Inflation YoY & Core CPI', 'FOMC Rate Decision & Press Conference', 'ECB Monetary Policy Statement', 'China Caixin Manufacturing PMI'],
+    ['US Non-Farm Payrolls (NFP) & Unemployment Rate', 'Bank of Japan (BoJ) Yield Curve Control Decision', 'UK GDP Growth Rate QoQ', 'US Retail Sales Advance MoM'],
+    ['Federal Reserve Core PCE Price Index', 'OPEC+ Joint Ministerial Monitoring Committee', 'Eurozone Flash PMI Composite', 'US Initial Jobless Claims'],
+    ['US Producer Price Index (PPI) Final Demand', 'Reserve Bank of Australia (RBA) Rate Decision', 'China Trade Balance (USD)', 'UK Consumer Price Index (CPI)'],
+    ['US Gross Domestic Product (GDP) Annualized', 'Bank of England (BoE) Bank Rate Vote', 'Japan National Core CPI', 'US ISM Manufacturing PMI']
   ];
   
   const sentimentIdx = Math.floor(rng() * sentiments.length);
@@ -103,32 +103,32 @@ export async function generateSignals(marketType) {
   
   const pairsMap = {
     forex: [
-      { pair: 'EUR/USD', priceBase: 1.08, pipSize: 0.0001, spread: 0.0002 },
-      { pair: 'GBP/USD', priceBase: 1.27, pipSize: 0.0001, spread: 0.0003 },
-      { pair: 'USD/JPY', priceBase: 149.5, pipSize: 0.01, spread: 0.02 },
-      { pair: 'AUD/USD', priceBase: 0.66, pipSize: 0.0001, spread: 0.0002 },
-      { pair: 'USD/CHF', priceBase: 0.88, pipSize: 0.0001, spread: 0.0003 },
-      { pair: 'EUR/GBP', priceBase: 0.855, pipSize: 0.0001, spread: 0.0003 },
-      { pair: 'NZD/USD', priceBase: 0.61, pipSize: 0.0001, spread: 0.0003 },
-      { pair: 'USD/CAD', priceBase: 1.36, pipSize: 0.0001, spread: 0.0003 },
+      { pair: 'EUR/USD', priceBase: 1.1325, pipSize: 0.0001, spread: 0.0002 },
+      { pair: 'GBP/USD', priceBase: 1.3295, pipSize: 0.0001, spread: 0.0003 },
+      { pair: 'USD/JPY', priceBase: 143.80, pipSize: 0.01, spread: 0.02 },
+      { pair: 'AUD/USD', priceBase: 0.6415, pipSize: 0.0001, spread: 0.0002 },
+      { pair: 'USD/CHF', priceBase: 0.8245, pipSize: 0.0001, spread: 0.0003 },
+      { pair: 'EUR/GBP', priceBase: 0.8520, pipSize: 0.0001, spread: 0.0003 },
+      { pair: 'NZD/USD', priceBase: 0.5980, pipSize: 0.0001, spread: 0.0003 },
+      { pair: 'USD/CAD', priceBase: 1.3845, pipSize: 0.0001, spread: 0.0003 },
     ],
     crypto: [
-      { pair: 'BTC/USDT', priceBase: 67500, pipSize: 1, spread: 10 },
-      { pair: 'ETH/USDT', priceBase: 3350, pipSize: 0.1, spread: 1 },
-      { pair: 'SOL/USDT', priceBase: 145, pipSize: 0.01, spread: 0.1 },
-      { pair: 'BNB/USDT', priceBase: 580, pipSize: 0.1, spread: 0.5 },
-      { pair: 'XRP/USDT', priceBase: 0.62, pipSize: 0.0001, spread: 0.001 },
-      { pair: 'ADA/USDT', priceBase: 0.45, pipSize: 0.0001, spread: 0.001 },
-      { pair: 'DOGE/USDT', priceBase: 0.15, pipSize: 0.0001, spread: 0.001 },
+      { pair: 'BTC/USDT', priceBase: 94000, pipSize: 1, spread: 10 },
+      { pair: 'ETH/USDT', priceBase: 1820, pipSize: 0.1, spread: 1 },
+      { pair: 'SOL/USDT', priceBase: 148, pipSize: 0.01, spread: 0.1 },
+      { pair: 'BNB/USDT', priceBase: 600, pipSize: 0.1, spread: 0.5 },
+      { pair: 'XRP/USDT', priceBase: 2.18, pipSize: 0.0001, spread: 0.001 },
+      { pair: 'ADA/USDT', priceBase: 0.71, pipSize: 0.0001, spread: 0.001 },
+      { pair: 'DOGE/USDT', priceBase: 0.175, pipSize: 0.0001, spread: 0.001 },
     ],
     stocks: [
-      { pair: 'AAPL', priceBase: 178, pipSize: 0.01, spread: 0.05 },
-      { pair: 'MSFT', priceBase: 415, pipSize: 0.01, spread: 0.10 },
-      { pair: 'GOOGL', priceBase: 155, pipSize: 0.01, spread: 0.05 },
-      { pair: 'AMZN', priceBase: 185, pipSize: 0.01, spread: 0.05 },
-      { pair: 'TSLA', priceBase: 245, pipSize: 0.01, spread: 0.10 },
-      { pair: 'NVDA', priceBase: 875, pipSize: 0.01, spread: 0.20 },
-      { pair: 'META', priceBase: 505, pipSize: 0.01, spread: 0.10 },
+      { pair: 'AAPL', priceBase: 212, pipSize: 0.01, spread: 0.05 },
+      { pair: 'MSFT', priceBase: 395, pipSize: 0.01, spread: 0.10 },
+      { pair: 'GOOGL', priceBase: 163, pipSize: 0.01, spread: 0.05 },
+      { pair: 'AMZN', priceBase: 190, pipSize: 0.01, spread: 0.05 },
+      { pair: 'TSLA', priceBase: 285, pipSize: 0.01, spread: 0.10 },
+      { pair: 'NVDA', priceBase: 109, pipSize: 0.01, spread: 0.20 },
+      { pair: 'META', priceBase: 560, pipSize: 0.01, spread: 0.10 },
     ]
   };
   
@@ -255,45 +255,48 @@ function determineTrend(imageAnalysis, pair, timeframe) {
   };
 }
 
-function calculateSupportResistance(imageAnalysis, pair, timeframe) {
+function calculateSupportResistance(imageAnalysis, pair, timeframe, currentPrice = null) {
   const rng = seededRandom(stringToSeed(pair + timeframe));
   const { trend } = imageAnalysis;
   
-  // Generate realistic-looking S/R levels based on pair type
-  const pairUpper = pair.toUpperCase();
   let basePrice, pipSize, srDistance;
   
-  // Detect price characteristics from pair name
-  if (pairUpper.includes('JPY')) {
-    basePrice = 148 + rng() * 5;
-    pipSize = 0.01;
-    srDistance = 0.3 + rng() * 1.0;
-  } else if (pairUpper.includes('BTC')) {
-    basePrice = 65000 + rng() * 5000;
-    pipSize = 1;
-    srDistance = 500 + rng() * 2000;
-  } else if (pairUpper.includes('ETH')) {
-    basePrice = 3200 + rng() * 400;
-    pipSize = 0.1;
-    srDistance = 50 + rng() * 200;
-  } else if (pairUpper.includes('SOL')) {
-    basePrice = 135 + rng() * 25;
-    pipSize = 0.01;
-    srDistance = 3 + rng() * 10;
-  } else if (pairUpper.includes('XRP')) {
-    basePrice = 0.55 + rng() * 0.15;
-    pipSize = 0.0001;
-    srDistance = 0.01 + rng() * 0.05;
-  } else if (/^[A-Z]{1,5}$/.test(pairUpper) && !pairUpper.includes('/')) {
-    // Stock ticker
-    basePrice = 100 + rng() * 300;
-    pipSize = 0.01;
-    srDistance = 2 + rng() * 10;
+  // ── If the user supplied the real market price, use it directly ──────────
+  if (currentPrice && !isNaN(currentPrice) && currentPrice > 0) {
+    basePrice = currentPrice;
+    // Derive a sensible S/R distance based on price magnitude
+    if (currentPrice >= 10000)      srDistance = currentPrice * 0.003 + rng() * currentPrice * 0.002; // e.g. BTC
+    else if (currentPrice >= 1000)  srDistance = currentPrice * 0.004 + rng() * currentPrice * 0.002; // e.g. XAU
+    else if (currentPrice >= 100)   srDistance = currentPrice * 0.005 + rng() * currentPrice * 0.003; // e.g. stocks
+    else if (currentPrice >= 1)     srDistance = currentPrice * 0.006 + rng() * currentPrice * 0.004; // e.g. forex majors
+    else                            srDistance = currentPrice * 0.01  + rng() * currentPrice * 0.005; // e.g. low-price pairs
+    pipSize = currentPrice >= 100 ? 0.01 : currentPrice >= 1 ? 0.0001 : 0.00001;
   } else {
-    // Default forex pair
-    basePrice = 1.0 + rng() * 0.4;
-    pipSize = 0.0001;
-    srDistance = 0.002 + rng() * 0.01;
+    // ── Fallback: estimate from pair name ────────────────────────────────────
+    const pairUpper = pair.toUpperCase();
+    if (pairUpper.includes('JPY')) {
+      basePrice = 142 + rng() * 4; pipSize = 0.01; srDistance = 0.3 + rng() * 1.0;
+    } else if (pairUpper.includes('BTC')) {
+      basePrice = 92000 + rng() * 4000; pipSize = 1; srDistance = 500 + rng() * 2000;
+    } else if (pairUpper.includes('ETH')) {
+      basePrice = 1780 + rng() * 100; pipSize = 0.1; srDistance = 20 + rng() * 60;
+    } else if (pairUpper.includes('SOL')) {
+      basePrice = 143 + rng() * 12; pipSize = 0.01; srDistance = 3 + rng() * 8;
+    } else if (pairUpper.includes('XRP')) {
+      basePrice = 2.10 + rng() * 0.15; pipSize = 0.0001; srDistance = 0.03 + rng() * 0.08;
+    } else if (pairUpper.includes('XAU') || pairUpper.includes('GOLD')) {
+      basePrice = 4580 + rng() * 80; pipSize = 0.01; srDistance = 15 + rng() * 40;
+    } else if (pairUpper.includes('NVDA')) {
+      basePrice = 105 + rng() * 8; pipSize = 0.01; srDistance = 2 + rng() * 5;
+    } else if (pairUpper.includes('AAPL')) {
+      basePrice = 208 + rng() * 8; pipSize = 0.01; srDistance = 2 + rng() * 5;
+    } else if (pairUpper.includes('MSFT')) {
+      basePrice = 390 + rng() * 10; pipSize = 0.01; srDistance = 3 + rng() * 8;
+    } else if (/^[A-Z]{1,5}$/.test(pairUpper) && !pairUpper.includes('/')) {
+      basePrice = 150 + rng() * 200; pipSize = 0.01; srDistance = 2 + rng() * 10;
+    } else {
+      basePrice = 1.0 + rng() * 0.4; pipSize = 0.0001; srDistance = 0.002 + rng() * 0.01;
+    }
   }
   
   // Adjust based on detected trend
@@ -518,39 +521,39 @@ function buildSummary(trend, patterns, signals, pair, timeframe) {
 function generateForexInsights(rng) {
   const allInsights = [
     {
-      category: 'Forex',
-      title: 'EUR/USD — ECB vs Fed Policy Divergence',
-      summary: 'The EUR/USD pair remains sensitive to central bank policy expectations. Recent hawkish ECB commentary contrasts with growing expectations of Fed rate cuts, potentially supporting euro strength. Key support at 1.0750 and resistance at 1.0950.',
+      category: 'Forex & Commodities',
+      title: 'XAU/USD — Gold Safe-Haven Demand Amidst Geopolitical Friction',
+      summary: 'Gold (XAU/USD) is testing the critical $2,350 supply zone. Geopolitical tensions in the Middle East and structural central bank purchasing (particularly from the PBOC) are providing a robust floor. However, surging US 10-year Treasury yields (>4.5%) act as a major headwind. A weekly close above $2,380 is required to invalidate the immediate bearish divergence on the daily RSI.',
       impact: rng() > 0.5 ? 'bullish' : 'neutral',
-      confidence: 'medium'
+      confidence: 'high'
     },
     {
-      category: 'Forex',
-      title: 'GBP/USD — UK Economic Resilience',
-      summary: 'Sterling shows resilience despite mixed UK economic data. The Bank of England\'s cautious stance on rate cuts provides support. Watch the 1.2600-1.2800 range for directional clues. Services PMI data will be key.',
-      impact: rng() > 0.4 ? 'bullish' : 'neutral',
-      confidence: 'medium'
-    },
-    {
-      category: 'Forex',
-      title: 'USD/JPY — Intervention Risk Elevated',
-      summary: 'USD/JPY remains near multi-decade highs, raising intervention risk from the Bank of Japan. While the interest rate differential supports dollar strength, any verbal or actual intervention could trigger sharp reversals. Trade with caution above 150.00.',
+      category: 'Forex Macro',
+      title: 'EUR/USD — ECB Rate Cut Pricing Widens the Transatlantic Spread',
+      summary: 'The EUR/USD pair has breached the 1.0700 psychological support. The divergence in monetary policy is stark: OIS markets are pricing in 75bps of cuts from the ECB this year, while Fed rate cut expectations have dwindled to less than 40bps. Technically, the pair is operating within a descending regression channel, with the next major liquidity pool located at 1.0620.',
       impact: 'bearish',
       confidence: 'high'
     },
     {
-      category: 'Forex',
-      title: 'AUD/USD — Commodity Currency Under Pressure',
-      summary: 'The Australian dollar faces headwinds from Chinese economic slowdown concerns and falling commodity prices. RBA policy decisions and iron ore prices remain key drivers. Support at 0.6500 is critical for maintaining bullish structure.',
+      category: 'Forex Macro',
+      title: 'USD/JPY — BoJ Intervention Threat vs. Yield Differentials',
+      summary: 'USD/JPY is hovering dangerously close to the 155.00 threshold, historically a trigger point for Bank of Japan (BoJ) FX intervention. Despite verbal warnings from the Ministry of Finance, the persistent US-Japan real yield differential continues to sponsor the carry trade. Implied volatility in USD/JPY options is spiking, indicating traders are hedging against a sudden, violent intervention-driven flush.',
+      impact: 'neutral',
+      confidence: 'medium'
+    },
+    {
+      category: 'Global News',
+      title: 'Commodity Currencies — AUD & CAD Under Pressure from China Data',
+      summary: 'The Australian Dollar (AUD) and Canadian Dollar (CAD) are facing severe headwinds following a miss in China\'s industrial production data. Iron ore prices have slipped below $100/MT, directly impacting AUD/USD which has lost the 0.6500 handle. We expect continued weakness in cyclical currencies until Chinese stimulus measures demonstrate tangible economic transmission.',
       impact: 'bearish',
       confidence: 'medium'
     },
     {
-      category: 'Forex',
-      title: 'DXY Dollar Index — Macro Outlook',
-      summary: 'The US Dollar Index (DXY) is consolidating near key levels as markets weigh inflation data against growth concerns. A sustained break above 105 would signal renewed dollar strength, while a drop below 103 opens the door for broader weakness.',
-      impact: rng() > 0.5 ? 'bullish' : 'bearish',
-      confidence: 'medium'
+      category: 'Forex Macro',
+      title: 'DXY — US Dollar Index Breaks Out on Inflation Stickiness',
+      summary: 'The US Dollar Index (DXY) has staged a bullish breakout above the 105.50 resistance confluence. Consecutive months of sticky US Core CPI have forced a hawkish repricing of the Fed\'s terminal rate. The DXY is now trading above its 200-day SMA with expanding Bollinger Bands, signaling a high-probability continuation toward the 107.00 macro resistance.',
+      impact: 'bullish',
+      confidence: 'high'
     },
   ];
   
@@ -563,39 +566,39 @@ function generateForexInsights(rng) {
 function generateCryptoInsights(rng) {
   const allInsights = [
     {
-      category: 'Crypto',
-      title: 'Bitcoin — Halving Cycle Dynamics',
-      summary: 'BTC continues to trade within the post-halving accumulation phase. Historical patterns suggest significant upside potential in the 12-18 months following halving events. On-chain data shows strong holder conviction with exchange reserves declining.',
+      category: 'Crypto Technicals',
+      title: 'Bitcoin (BTC) — Post-Halving Supply Shock and ETF Flows',
+      summary: 'BTC is consolidating in a high-timeframe ascending triangle below the $70k liquidity cluster. On-chain metrics reveal a severe illiquidity shock: OTC desk balances are heavily depleted, and long-term holder distribution has completely halted. Despite recent net outflows from US Spot ETFs, the structural bid remains aggressive. A daily close above $71,500 projects a measured move to $84,000.',
       impact: 'bullish',
       confidence: 'high'
     },
     {
-      category: 'Crypto',
-      title: 'Ethereum — Network Activity Surge',
-      summary: 'ETH network activity metrics are trending upward with increasing DeFi TVL and NFT volumes. EIP-4844 (Proto-Danksharding) has reduced L2 fees significantly, driving adoption. The ETH/BTC ratio is at a key inflection point.',
-      impact: rng() > 0.4 ? 'bullish' : 'neutral',
+      category: 'Crypto Macro',
+      title: 'Ethereum (ETH) — Regulatory Clarity and Institutional Adoption',
+      summary: 'ETH is facing intense regulatory scrutiny from the SEC regarding its security classification, creating a massive overhang on price action. However, the underlying network economics are robust: the deflationary burn rate (EIP-1559) and restaking TVL via EigenLayer are removing massive amounts of ETH from circulating supply. Key technical support sits at $2,850.',
+      impact: rng() > 0.5 ? 'bullish' : 'neutral',
       confidence: 'medium'
     },
     {
-      category: 'Crypto',
-      title: 'Solana — Ecosystem Growth Accelerating',
-      summary: 'SOL ecosystem continues to attract developers and users with high-speed, low-cost transactions. DeFi protocols on Solana are seeing increased TVL. Technical structure looks constructive above $120 support.',
+      category: 'Altcoin Sector',
+      title: 'Solana (SOL) — Network Congestion Resolved, DeFi TVL Surges',
+      summary: 'Following the successful deployment of the v1.17 update, Solana\'s network congestion issues have been largely resolved. The ecosystem is experiencing a renaissance in DeFi TVL and decentralized exchange (DEX) volume, consistently outpacing Ethereum L1. Technically, SOL has established a strong higher-low structure above the 50-day EMA at $135.',
+      impact: 'bullish',
+      confidence: 'high'
+    },
+    {
+      category: 'Global Crypto News',
+      title: 'Stablecoin Regulation — EU MiCA Implementation Looms',
+      summary: 'The impending implementation of the Markets in Crypto-Assets (MiCA) regulation in the EU is forcing major exchanges to delist non-compliant stablecoins (like USDT). This regulatory shift is causing temporary liquidity fragmentation in Euro-denominated pairs but will ultimately drive institutional capital toward compliant alternatives like USDC.',
+      impact: 'neutral',
+      confidence: 'medium'
+    },
+    {
+      category: 'Crypto On-Chain',
+      title: 'DeFi & RWA Narrative — Real World Assets Lead Capital Inflows',
+      summary: 'The Tokenization of Real World Assets (RWA) is currently the strongest narrative in crypto, driven by BlackRock\'s BUIDL fund launch. Protocols tokenizing US Treasuries are seeing exponential TVL growth. This sector is exhibiting negative correlation to the broader crypto market, serving as a defensive high-yield haven during BTC consolidations.',
       impact: 'bullish',
       confidence: 'medium'
-    },
-    {
-      category: 'Crypto',
-      title: 'Market-Wide — Regulatory Landscape',
-      summary: 'Regulatory clarity is gradually improving with several jurisdictions establishing frameworks for digital assets. While short-term uncertainty remains, the long-term trend toward regulated crypto markets is generally constructive for institutional adoption.',
-      impact: 'neutral',
-      confidence: 'medium'
-    },
-    {
-      category: 'Crypto',
-      title: 'DeFi Sector — Yield Opportunities',
-      summary: 'DeFi yields have stabilized after the recent volatility. Staking yields remain attractive on major chains like Ethereum (3-5%) and Solana (6-8%). Liquidity mining incentives on newer protocols offer higher but riskier returns.',
-      impact: 'neutral',
-      confidence: 'low'
     },
   ];
   
@@ -607,39 +610,39 @@ function generateCryptoInsights(rng) {
 function generateStockInsights(rng) {
   const allInsights = [
     {
-      category: 'Stocks',
-      title: 'Tech Sector — AI-Driven Rally',
-      summary: 'Technology stocks continue to benefit from the AI investment boom. Semiconductor companies (NVDA, AMD, AVGO) lead the charge, while software companies with AI integration show strong revenue growth. Valuations are elevated but supported by earnings growth.',
+      category: 'Equities Macro',
+      title: 'Tech Sector — Semiconductor Overextension and AI CapEx',
+      summary: 'The AI-driven semiconductor rally (led by NVDA, TSM, ASML) is exhibiting signs of technical exhaustion. Forward P/E multiples have expanded to 99th percentile historical extremes. While hyperscaler CapEx guidance remains robust, momentum indicators (MACD, RSI) on the SOXX ETF are showing pronounced bearish divergence. We anticipate a 10-15% tactical correction before the secular uptrend resumes.',
+      impact: 'bearish',
+      confidence: 'medium'
+    },
+    {
+      category: 'Global Indices',
+      title: 'S&P 500 (SPX) — Breadth Divergence and Gamma Squeeze Dynamics',
+      summary: 'The SPX is grinding higher, but market breadth is deteriorating alarmingly; less than 40% of constituents are trading above their 50-day moving averages. The index is being levitated by short-dated options activity (0DTE) creating synthetic gamma squeezes. A break below the 5,050 gamma wall could trigger a rapid systematic deleveraging event from CTA trend followers.',
+      impact: 'neutral',
+      confidence: 'high'
+    },
+    {
+      category: 'Equities Sector',
+      title: 'Energy (XLE) — Geopolitical Risk Premium and Supply Constraints',
+      summary: 'The Energy sector (XLE) is exhibiting tremendous relative strength against the broader market. WTI Crude\'s stabilization above $80/bbl, driven by OPEC+ production discipline and Middle East supply risk premiums, is driving massive free cash flow yields for E&P companies. The sector remains deeply undervalued relative to historical cash flow multiples.',
       impact: 'bullish',
       confidence: 'high'
     },
     {
-      category: 'Stocks',
-      title: 'S&P 500 — Broadening Participation',
-      summary: 'The market rally is beginning to broaden beyond mega-cap tech stocks. Equal-weighted S&P 500 is catching up to the cap-weighted index, suggesting healthier market internals. This breadth improvement is typically a positive signal for market sustainability.',
+      category: 'Global News',
+      title: 'European Equities — STOXX 600 Reaches All-Time Highs on Earnings',
+      summary: 'European equities have defied economic pessimism, with the STOXX 600 breaking out to record highs. The rally is fundamentally underpinned by the "GRANOLAS" (Europe\'s equivalent to the Magnificent 7), which are delivering massive earnings beats and aggressive share buybacks. The valuation discount relative to the US S&P 500 remains near record levels (approx. 35%).',
       impact: 'bullish',
       confidence: 'medium'
     },
     {
-      category: 'Stocks',
-      title: 'Banks & Financials — Rate Sensitivity',
-      summary: 'Financial sector stocks face mixed signals as rate cut expectations impact net interest margins. Strong capital markets activity provides offset. Watch for earnings guidance on credit quality and loan growth as key sentiment drivers.',
-      impact: 'neutral',
-      confidence: 'medium'
-    },
-    {
-      category: 'Stocks',
-      title: 'Energy Sector — Oil Price Dynamics',
-      summary: 'Energy stocks are navigating volatile oil prices driven by OPEC+ decisions and global demand concerns. Despite geopolitical risk premium, demand growth from Asia remains the key bullish catalyst. Dividend yields in the sector remain attractive.',
-      impact: rng() > 0.5 ? 'bullish' : 'bearish',
-      confidence: 'low'
-    },
-    {
-      category: 'Stocks',
-      title: 'NASDAQ — Growth vs Value Rotation',
-      summary: 'Growth stocks on the NASDAQ continue to outperform value, driven by strong earnings from mega-cap tech. However, rising bond yields could trigger a rotation toward value sectors. Monitor the 10-year Treasury yield closely for rotation signals.',
-      impact: 'neutral',
-      confidence: 'medium'
+      category: 'Equities Macro',
+      title: 'Russell 2000 (IWM) — Small Caps Crushed by Refinancing Cliff',
+      summary: 'Small-cap equities remain the weakest link in global markets. The Russell 2000 is heavily burdened by floating-rate debt and faces a massive "refinancing cliff" over the next 18 months. With the 10-year Treasury yield surging, the cost of capital for these companies is destroying profit margins. The IWM/SPY ratio has broken down to levels not seen since the dot-com bubble.',
+      impact: 'bearish',
+      confidence: 'high'
     },
   ];
   
