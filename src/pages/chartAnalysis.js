@@ -89,55 +89,65 @@ export function renderChartAnalysis(container) {
             <span class="card-title">⚙️ Analysis Configuration</span>
           </div>
           <div class="analysis-config">
-            <div class="form-group">
-              <label for="market-type">Market Type</label>
-              <select id="market-type">
-                <option value="forex">Forex</option>
-                <option value="crypto">Crypto</option>
-                <option value="stocks">Stocks</option>
-              </select>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="market-type">Market Type</label>
+                <select id="market-type">
+                  <option value="forex">Forex</option>
+                  <option value="crypto">Crypto</option>
+                  <option value="stocks">Stocks</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="pair-input">Trading Pair</label>
+                <input type="text" id="pair-input" list="pair-options" placeholder="e.g., EUR/USD, BTC/USDT, AAPL" />
+                <datalist id="pair-options"></datalist>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="pair-input">Trading Pair</label>
-              <input type="text" id="pair-input" placeholder="e.g., EUR/USD, BTC/USDT, AAPL" />
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="current-price" style="display:flex;align-items:center;gap:6px;">
+                  Current Market Price
+                  <span style="font-size:0.72rem;font-weight:500;background:var(--purple-100);color:var(--purple-600);padding:2px 7px;border-radius:20px;">Live</span>
+                </label>
+                <input type="number" id="current-price" placeholder="e.g., 4614.399" step="any" min="0"
+                  style="border:1.5px solid var(--purple-200);" />
+                <span style="font-size:0.74rem;color:var(--gray-400);margin-top:4px;display:block;">Enter exact chart price</span>
+              </div>
+              <div class="form-group">
+                <label for="timeframe-select">Timeframe</label>
+                <select id="timeframe-select">
+                  <option value="1m">1 Minute</option>
+                  <option value="5m">5 Minutes</option>
+                  <option value="15m">15 Minutes</option>
+                  <option value="30m">30 Minutes</option>
+                  <option value="1h" selected>1 Hour</option>
+                  <option value="4h">4 Hours</option>
+                  <option value="1d">1 Day</option>
+                  <option value="1w">1 Week</option>
+                  <option value="1M">1 Month</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="current-price" style="display:flex;align-items:center;gap:6px;">
-                Current Market Price
-                <span style="font-size:0.72rem;font-weight:500;background:var(--purple-100);color:var(--purple-600);padding:2px 7px;border-radius:20px;">Live</span>
-              </label>
-              <input type="number" id="current-price" placeholder="e.g., 4614.399" step="any" min="0"
-                style="border:1.5px solid var(--purple-200);" />
-              <span style="font-size:0.74rem;color:var(--gray-400);margin-top:4px;display:block;">Enter the exact price shown on your chart for accurate signals</span>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="account-balance">Account Balance ($)</label>
+                <input type="number" id="account-balance" placeholder="e.g., 10000" value="10000" min="100" />
+              </div>
+              <div class="form-group">
+                <label for="risk-percent">Risk Per Trade (%)</label>
+                <select id="risk-percent">
+                  <option value="0.5">0.5% (Conservative)</option>
+                  <option value="1" selected>1% (Recommended)</option>
+                  <option value="1.5">1.5%</option>
+                  <option value="2">2% (Aggressive)</option>
+                  <option value="3">3% (High Risk)</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="timeframe-select">Timeframe</label>
-              <select id="timeframe-select">
-                <option value="1m">1 Minute</option>
-                <option value="5m">5 Minutes</option>
-                <option value="15m">15 Minutes</option>
-                <option value="30m">30 Minutes</option>
-                <option value="1h" selected>1 Hour</option>
-                <option value="4h">4 Hours</option>
-                <option value="1d">1 Day</option>
-                <option value="1w">1 Week</option>
-                <option value="1M">1 Month</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="account-balance">Account Balance ($)</label>
-              <input type="number" id="account-balance" placeholder="e.g., 10000" value="10000" min="100" />
-            </div>
-            <div class="form-group">
-              <label for="risk-percent">Risk Per Trade (%)</label>
-              <select id="risk-percent">
-                <option value="0.5">0.5% (Conservative)</option>
-                <option value="1" selected>1% (Recommended)</option>
-                <option value="1.5">1.5%</option>
-                <option value="2">2% (Aggressive)</option>
-                <option value="3">3% (High Risk)</option>
-              </select>
-            </div>
+
             <div class="form-group">
               <label for="analysis-depth">Analysis Depth</label>
               <select id="analysis-depth">
@@ -146,7 +156,8 @@ export function renderChartAnalysis(container) {
                 <option value="comprehensive">Comprehensive</option>
               </select>
             </div>
-            <button class="analyze-btn" id="analyze-btn" disabled>
+            
+            <button class="analyze-btn" id="analyze-btn" disabled style="margin-top:8px;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
               Analyze with AI
             </button>
@@ -159,7 +170,7 @@ export function renderChartAnalysis(container) {
       <!-- Right Column: Results & Chatbot -->
       <div class="chart-right-col">
         <!-- Results Container -->
-        <div id="analysis-results-container">
+        <div id="analysis-results-container" style="flex: 0 1 auto; max-height: 55%; overflow-y: auto; scrollbar-width: thin; padding-right: 4px;">
           <div class="card">
             <div class="empty-state">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -174,7 +185,7 @@ export function renderChartAnalysis(container) {
         </div>
         
         <!-- AI Chatbot -->
-        <div class="card chatbot-card" style="margin-top:20px; display:flex; flex-direction:column; max-height: 500px;">
+        <div class="card chatbot-card" style="margin-top:20px; display:flex; flex-direction:column; flex: 1; min-height: 0;">
           <div class="card-header">
             <span class="card-title">🤖 AI Trading Assistant</span>
             <button class="btn btn-outline" id="clear-chat-btn" style="padding:4px 12px;font-size:0.72rem;">Clear</button>
@@ -184,15 +195,15 @@ export function renderChartAnalysis(container) {
               <div class="chat-avatar">🤖</div>
               <div class="chat-bubble">
                 <p>Hello! I'm your AI trading assistant. I can help you with:</p>
-                <p>• <strong>Chart analysis</strong> questions<br>• <strong>Entry, SL, TP</strong> advice<br>• <strong>Risk management</strong><br>• <strong>Technical indicators</strong> (RSI, MACD, MAs)<br>• <strong>Chart patterns</strong><br>• <strong>Trading strategies</strong></p>
+                <p>• <strong>Chart analysis</strong> questions<br>• <strong>Entry, SL, TP</strong> advice<br>• <strong>Risk management</strong><br>• <strong>Technical indicators</strong><br>• <strong>Chart patterns & strategies</strong></p>
                 <p>Upload a chart and analyze it, then ask me anything! 📊</p>
               </div>
             </div>
           </div>
-          <div class="chatbot-input-area" style="border-top:1px solid var(--purple-100); padding:16px; display:flex; gap:10px;">
-            <input type="text" id="chatbot-input" placeholder="Ask about the chart, indicators, risk management..." style="flex:1; padding:12px; border-radius:var(--radius-md); border:1px solid var(--gray-200); outline:none;"/>
-            <button class="chatbot-send-btn" id="chatbot-send-btn" style="background:var(--purple-600); color:white; width:48px; height:48px; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <div class="chatbot-input-area" style="border-top:1px solid var(--gray-100); padding:16px; display:flex; gap:10px; background: var(--white); border-bottom-left-radius: var(--radius-lg); border-bottom-right-radius: var(--radius-lg);">
+            <input type="text" id="chatbot-input" placeholder="Ask about the chart, indicators, risk management..." style="flex:1; padding:12px 16px; border-radius:var(--radius-full); border:1px solid var(--gray-200); outline:none; font-size:0.9rem;"/>
+            <button class="chatbot-send-btn" id="chatbot-send-btn" style="background:#1E3A8A; color:white; width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; transition:all 0.2s;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;margin-right:2px;margin-top:2px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
         </div>
@@ -203,7 +214,56 @@ export function renderChartAnalysis(container) {
   initUpload();
   initAnalysis();
   initChatbot();
+  initPairDropdown();
   restoreSessionState();
+}
+
+function initPairDropdown() {
+  const marketType = document.getElementById('market-type');
+  const datalist = document.getElementById('pair-options');
+  const pairInput = document.getElementById('pair-input');
+
+  const options = {
+    forex: [
+      'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD',
+      'EUR/GBP', 'EUR/JPY', 'GBP/JPY', 'AUD/JPY', 'EUR/AUD', 'EUR/CHF', 'GBP/CHF',
+      'AUD/CAD', 'AUD/CHF', 'AUD/NZD', 'CAD/CHF', 'CAD/JPY', 'CHF/JPY', 'EUR/CAD'
+    ],
+    crypto: [
+      'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT', 'ADA/USDT', 
+      'DOGE/USDT', 'DOT/USDT', 'AVAX/USDT', 'LINK/USDT', 'MATIC/USDT', 'LTC/USDT',
+      'UNI/USDT', 'BCH/USDT', 'XLM/USDT', 'ALGO/USDT', 'VET/USDT', 'ICP/USDT'
+    ],
+    stocks: [
+      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'JPM', 'V', 'WMT', 
+      'NFLX', 'AMD', 'INTC', 'BA', 'DIS', 'BAC', 'CSCO', 'PEP', 'KO', 'MCD'
+    ]
+  };
+
+  function updateOptions() {
+    const type = marketType.value;
+    datalist.innerHTML = '';
+    
+    if (options[type]) {
+      options[type].forEach(pair => {
+        const option = document.createElement('option');
+        option.value = pair;
+        datalist.appendChild(option);
+      });
+    }
+    
+    // Clear input when switching markets if it doesn't match the new type
+    if (pairInput.value && !options[type].includes(pairInput.value)) {
+      pairInput.value = '';
+      pairInput.placeholder = type === 'forex' ? 'e.g., EUR/USD' : 
+                              type === 'crypto' ? 'e.g., BTC/USDT' : 'e.g., AAPL';
+    }
+  }
+
+  marketType.addEventListener('change', updateOptions);
+  
+  // Initial populate
+  updateOptions();
 }
 
 // ─── Restore persisted state after DOM is ready ──────────────────────────────
@@ -355,6 +415,7 @@ function initAnalysis() {
     const timeframe = document.getElementById('timeframe-select').value;
     const currentPriceRaw = document.getElementById('current-price').value.trim();
     const currentPrice = currentPriceRaw ? parseFloat(currentPriceRaw) : null;
+    const analysisDepth = document.getElementById('analysis-depth')?.value || 'detailed';
 
     if (!pair) {
       showToast('Please enter the trading pair', 'error');
@@ -365,7 +426,7 @@ function initAnalysis() {
     analyzeBtn.innerHTML = '<div class="spinner"></div> Analyzing...';
 
     try {
-      const result = await analyzeChart(uploadedImage, uploadedMimeType, pair, timeframe, currentPrice);
+      const result = await analyzeChart(uploadedImage, uploadedMimeType, pair, timeframe, currentPrice, analysisDepth);
       lastAnalysis = result;
       setChatAnalysis(result);
       displayResults(result, pair, timeframe);

@@ -1,15 +1,56 @@
 // Local Storage Utilities
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   API_KEY: 'tradevision_gemini_key',
-  HISTORY: 'tradevision_analysis_history'
+  USE_BUILTIN: 'tradevision_use_builtin',
+  HISTORY: 'tradevision_analysis_history',
+  RISK_SETTINGS: 'tradevision_risk_settings',
+  TRADE_LOG: 'tradevision_trade_log',
+  TRADE_JOURNAL: 'tradevision_trade_journal',
+  PREDICTIONS: 'tv_model_predictions'
 };
+
+export const storage = {
+  get(key) {
+    const data = localStorage.getItem(key);
+    try {
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return data;
+    }
+  },
+  
+  set(key, value) {
+    const val = typeof value === 'object' ? JSON.stringify(value) : value;
+    localStorage.setItem(key, val);
+  },
+  
+  push(key, value, maxItems = null) {
+    let arr = this.get(key);
+    if (!Array.isArray(arr)) arr = [];
+    arr.unshift(value); // add to beginning
+    if (maxItems && arr.length > maxItems) {
+      arr = arr.slice(0, maxItems);
+    }
+    this.set(key, arr);
+  },
+  
+  remove(key) {
+    localStorage.removeItem(key);
+  },
+  
+  clear() {
+    localStorage.clear();
+  }
+};
+
+// Legacy exports for backward compatibility
 export function getApiKey() {
-  return localStorage.getItem(STORAGE_KEYS.API_KEY);
+  return storage.get(STORAGE_KEYS.API_KEY);
 }
 
 export function setApiKey(key) {
-  localStorage.setItem(STORAGE_KEYS.API_KEY, key);
+  storage.set(STORAGE_KEYS.API_KEY, key);
 }
 
 export function hasApiKey() {
@@ -18,40 +59,27 @@ export function hasApiKey() {
 }
 
 export function removeApiKey() {
-  localStorage.removeItem(STORAGE_KEYS.API_KEY);
+  storage.remove(STORAGE_KEYS.API_KEY);
 }
 
 export function saveAnalysisToHistory(imageData, mimeType, pair, timeframe, analysisResult) {
-  try {
-    const history = getAnalysisHistory();
-    const newEntry = {
-      id: Date.now().toString(),
-      timestamp: Date.now(),
-      image: `data:${mimeType};base64,${imageData}`,
-      pair,
-      pair,
-      timeframe,
-      result: analysisResult
-    };
-    history.unshift(newEntry);
-
-    // Keep only last 15 to avoid localStorage size issues (~5MB limit)
-    if (history.length > 15) {
-      history.pop();
-    }
-    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
-  } catch(e) {
-    console.error("Storage limit reached or failed saving", e);
-  }
+  const newEntry = {
+    id: Date.now().toString(),
+    timestamp: Date.now(),
+    image: `data:${mimeType};base64,${imageData}`,
+    pair,
+    timeframe,
+    result: analysisResult
+  };
+  storage.push(STORAGE_KEYS.HISTORY, newEntry, 15);
 }
 
 export function getAnalysisHistory() {
-  const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
-  return data ? JSON.parse(data) : [];
+  return storage.get(STORAGE_KEYS.HISTORY) || [];
 }
 
 export function deleteAnalysisFromHistory(id) {
   const history = getAnalysisHistory();
   const updated = history.filter(item => item.id !== id);
-  localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
+  storage.set(STORAGE_KEYS.HISTORY, updated);
 }

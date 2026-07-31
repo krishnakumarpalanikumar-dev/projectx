@@ -1,0 +1,153 @@
+/* ============================================
+   Signals Page
+   ============================================ */
+.signal-card {
+  border-left: 4px solid;
+  padding: 20px 24px;
+}
+
+.signal-card.buy-signal {
+  border-left-color: var(--success);
+}
+
+.signal-card.sell-signal {
+  border-left-color: var(--danger);
+}
+
+.signal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.signal-pair {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.signal-type {
+  padding: 4px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.signal-type.buy {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.signal-type.sell {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.signal-details {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.signal-detail {
+  text-align: center;
+  padding: 10px;
+  background: var(--gray-50);
+  border-radius: var(--radius-md);
+}
+
+.signal-detail-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.signal-detail-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+
+/* ============================================
+   Signal Strength Card
+   ============================================ */
+.signal-strength-card {
+  padding: 20px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--purple-100);
+}
+
+.signal-strength-card.buy-bg {
+  background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.signal-strength-card.sell-bg {
+  background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.signal-strength-card.hold-bg {
+  background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.signal-strength-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.signal-strength-icon {
+  font-size: 2rem;
+}
+
+.signal-strength-label {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--gray-900);
+  letter-spacing: 0.02em;
+}
+
+.signal-strength-conf {
+  font-size: 0.82rem;
+  color: var(--gray-600);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.signal-meter {
+  flex: 1;
+  height: 10px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-left: auto;
+}
+
+.signal-meter-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 1s ease;
+  animation: meterGrow 1s ease;
+}
+
+@keyframes meterGrow {
+  from { width: 0% !important; }
+}
+
+.signal-meter-value {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--gray-800);
+  min-width: 45px;
+  text-align: right;
+}
+
+

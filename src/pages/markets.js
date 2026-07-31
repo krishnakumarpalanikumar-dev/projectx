@@ -132,42 +132,44 @@ function renderTable() {
   }
 
   tableContainer.innerHTML = `
-    <table class="market-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Pair</th>
-          <th>Price (USD)</th>
-          <th>24h Change</th>
-          <th>24h High</th>
-          <th>24h Low</th>
-          <th>Volume</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${data.map((item, i) => `
+    <div class="market-table-wrapper">
+      <table class="market-table">
+        <thead>
           <tr>
-            <td style="color:var(--gray-400);font-weight:600;">${i + 1}</td>
-            <td>
-              <div class="pair-info">
-                ${item.image ? `<img src="${item.image}" style="width:28px;height:28px;border-radius:50%;" alt="${item.pair}"/>` :
-                  `<div class="pair-icon">${item.pair.substring(0, 2)}</div>`}
-                <div>
-                  <div class="symbol">${item.pair}</div>
-                  ${item.name ? `<div style="font-size:0.75rem;color:var(--gray-400);">${item.name}</div>` : ''}
-                </div>
-              </div>
-            </td>
-            <td style="font-weight:600;font-family:'JetBrains Mono',monospace;font-size:0.85rem;">$${item.price}</td>
-            <td class="${item.trend === 'up' ? 'price-up' : 'price-down'}">
-              ${item.trend === 'up' ? '▲' : '▼'} ${item.change}
-            </td>
-            <td style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--gray-600);">$${item.high}</td>
-            <td style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--gray-600);">$${item.low}</td>
-            <td style="font-size:0.85rem;color:var(--gray-600);">${item.volume}</td>
+            <th>#</th>
+            <th>Pair</th>
+            <th>Price (USD)</th>
+            <th>24h Change</th>
+            <th>24h High</th>
+            <th>24h Low</th>
+            <th>Volume</th>
           </tr>
-        `).join('')}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          ${data.map((item, i) => `
+            <tr>
+              <td style="color:var(--gray-400);font-weight:600;">${i + 1}</td>
+              <td>
+                <div class="pair-info">
+                  ${item.image ? `<img src="${item.image}" style="width:28px;height:28px;border-radius:50%;" alt="${item.pair}"/>` :
+                    `<div class="pair-icon">${item.pair.substring(0, 2)}</div>`}
+                  <div>
+                    <div class="symbol">${item.pair}</div>
+                    ${item.name ? `<div style="font-size:0.75rem;color:var(--gray-400);">${item.name}</div>` : ''}
+                  </div>
+                </div>
+              </td>
+              <td class="market-price">$${item.price}</td>
+              <td class="${item.trend === 'up' ? 'price-up' : 'price-down'}">
+                ${item.trend === 'up' ? '▲' : '▼'} ${item.change}
+              </td>
+              <td class="market-meta">$${item.high}</td>
+              <td class="market-meta">$${item.low}</td>
+              <td class="market-meta" style="color:var(--gray-600);">${item.volume}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
   `;
 }

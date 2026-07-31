@@ -2,18 +2,7 @@
 // TradeVision AI — Main Application
 // ============================================
 
-import { renderDashboard } from './pages/dashboard.js';
-import { renderChartAnalysis } from './pages/chartAnalysis.js';
-import { renderMarkets } from './pages/markets.js';
-import { renderSignals } from './pages/signals.js';
-import { renderAIInsights } from './pages/aiInsights.js';
-import { renderHistory } from './pages/history.js';
-import { renderRiskManager } from './pages/riskManager.js';
-import { renderTradeJournal } from './pages/tradeJournal.js';
-import { renderModelTracker } from './pages/modelTracker.js';
-import { renderTradingKnowledge } from './pages/tradingKnowledge.js';
-import { renderLogin } from './pages/login.js';
-import { renderSecret } from './pages/secret.js';
+// Pages are now lazily loaded using dynamic imports in navigateTo()
 import { showToast, initToasts } from './utils/toast.js';
 import { getApiKey, setApiKey, hasApiKey } from './utils/storage.js';
 import { setUseBuiltIn, getUseBuiltIn } from './utils/gemini.js';
@@ -38,7 +27,7 @@ function initNavigation() {
   });
 }
 
-function navigateTo(page) {
+async function navigateTo(page) {
   window.navigateTo = navigateTo; // Expose globally for login page
   currentPage = page;
   
@@ -57,9 +46,7 @@ function navigateTo(page) {
     'history': ['Database Backups', 'Your Saved Chart Analyses'],
     'risk-manager': ['Risk Manager', 'Position Sizing & Risk Control'],
     'trade-journal': ['Trade Journal', 'Log, Track & Analyze Your Trades'],
-    'model-tracker': ['Model Tracker', 'AI Model Performance & Metrics'],
-    'trading-knowledge': ['Trading Knowledge', 'Dashboard / Trading Knowledge'],
-    'login': ['Login', ''],
+
     'secret': ['Secret Admin', 'Hidden Admin Area']
   };
 
@@ -73,33 +60,82 @@ function navigateTo(page) {
   container.offsetHeight; // force reflow
   container.style.animation = 'fadeIn 0.4s ease';
 
-  // Toggle layout for login page
-  const sidebar = document.getElementById('sidebar');
-  const topbar = document.querySelector('.topbar');
-  const mainContent = document.getElementById('main-content');
-  if (page === 'login') {
-    sidebar.style.display = 'none';
-    topbar.style.display = 'none';
-    mainContent.style.marginLeft = '0';
-  } else {
-    sidebar.style.display = 'flex';
-    topbar.style.display = 'flex';
-    mainContent.style.marginLeft = 'var(--sidebar-width)';
-  }
 
-  switch (page) {
-    case 'dashboard': renderDashboard(container); break;
-    case 'chart-analysis': renderChartAnalysis(container); break;
-    case 'markets': renderMarkets(container); break;
-    case 'signals': renderSignals(container); break;
-    case 'ai-insights': renderAIInsights(container); break;
-    case 'history': renderHistory(container); break;
-    case 'risk-manager': renderRiskManager(container); break;
-    case 'trade-journal': renderTradeJournal(container); break;
-    case 'model-tracker': renderModelTracker(container); break;
-    case 'trading-knowledge': renderTradingKnowledge(container); break;
-    case 'login': renderLogin(container); break;
-    case 'secret': renderSecret(container); break;
+
+  // Show skeleton loader
+  container.innerHTML = `
+    <div class="skeleton-loader" style="width: 100%; height: 60vh; border-radius: var(--radius-lg); background: var(--surface-light); animation: pulse 1.5s infinite; display: flex; align-items: center; justify-content: center; color: var(--gray-500);">
+      Loading...
+    </div>
+  `;
+
+  // Helper to load CSS dynamically
+  const loadPageCSS = (pageName) => {
+    const cssId = `css-${pageName}`;
+    if (!document.getElementById(cssId)) {
+      const link = document.createElement('link');
+      link.id = cssId;
+      link.rel = 'stylesheet';
+      link.href = `/src/styles/pages/${pageName}.css`;
+      document.head.appendChild(link);
+    }
+  };
+
+  try {
+    switch (page) {
+      case 'dashboard': {
+        const { renderDashboard } = await import('./pages/dashboard.js');
+        renderDashboard(container); 
+        break;
+      }
+      case 'chart-analysis': {
+        loadPageCSS('chart');
+        const { renderChartAnalysis } = await import('./pages/chartAnalysis.js');
+        renderChartAnalysis(container); 
+        break;
+      }
+      case 'markets': {
+        loadPageCSS('markets');
+        const { renderMarkets } = await import('./pages/markets.js');
+        renderMarkets(container); 
+        break;
+      }
+      case 'signals': {
+        loadPageCSS('signals');
+        const { renderSignals } = await import('./pages/signals.js');
+        renderSignals(container); 
+        break;
+      }
+      case 'ai-insights': {
+        loadPageCSS('aiInsights');
+        const { renderAIInsights } = await import('./pages/aiInsights.js');
+        renderAIInsights(container); 
+        break;
+      }
+      case 'history': {
+        loadPageCSS('history');
+        const { renderHistory } = await import('./pages/history.js');
+        renderHistory(container); 
+        break;
+      }
+      case 'risk-manager': {
+        loadPageCSS('riskManager');
+        const { renderRiskManager } = await import('./pages/riskManager.js');
+        renderRiskManager(container); 
+        break;
+      }
+      case 'trade-journal': {
+        loadPageCSS('journal');
+        const { renderTradeJournal } = await import('./pages/tradeJournal.js');
+        renderTradeJournal(container); 
+        break;
+      }
+
+
+    }
+  } catch (error) {
+    container.innerHTML = `<div style="padding: 2rem; color: #ef4444;">Failed to load page: ${error.message}</div>`;
+    console.error(error);
   }
 
   // Close sidebar on mobile
@@ -219,6 +255,8 @@ function initMobileMenu() {
   });
 }
 
+
+
 // ============================================
 // Init
 // ============================================
@@ -229,13 +267,8 @@ function init() {
   initMobileMenu();
   updateApiStatus();
 
-  // Logo Login functionality
-  const logo = document.getElementById('brand-logo');
-  if (logo) {
-    logo.addEventListener('click', () => {
-      navigateTo('login');
-    });
-  }
+
+  // (Logo click handler removed as per Phase 1)
 
   navigateTo('dashboard');
 }

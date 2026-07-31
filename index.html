@@ -8,13 +8,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/src/styles/main.css" />
+  <link rel="stylesheet" href="/src/styles/base.css" />
+  <link rel="stylesheet" href="/src/styles/components.css" />
 </head>
 <body>
   <div id="app">
     <!-- Sidebar Navigation -->
     <nav id="sidebar" class="sidebar">
-      <div class="sidebar-brand" id="brand-logo" style="cursor: pointer;" title="Admin Login">
+      <div class="sidebar-brand">
         <div class="brand-icon">
           <svg viewBox="0 0 32 32" fill="none">
             <!-- Hexagon base -->
@@ -79,14 +80,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="13" y2="11"/></svg>
           <span>Trade Journal</span>
         </a>
-        <a href="#" class="nav-item" data-page="model-tracker" id="nav-model-tracker">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/><circle cx="7" cy="16" r="1.5"/><circle cx="11" cy="8" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="19" cy="6" r="1.5"/></svg>
-          <span>Model Tracker</span>
-        </a>
-        <a href="#" class="nav-item" data-page="trading-knowledge" id="nav-trading-knowledge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
-          <span>Trading Knowledge</span>
-        </a>
+
         <a href="#" class="nav-item" data-page="history" id="nav-history">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11v6a2 2 0 01-2 2H7a2 2 0 01-2-2v-6M3 9l9-7 9 7M12 2v10M12 22v-2"></path></svg>
           <span>Backup / History</span>
@@ -102,6 +96,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
           <span>Settings</span>
         </button>
+
       </div>
     </nav>
 

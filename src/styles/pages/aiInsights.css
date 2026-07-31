@@ -1,0 +1,53 @@
+/* ============================================
+   AI Insights
+   ============================================ */
+.insight-card {
+  background: var(--white);
+  border: 1px solid var(--purple-100);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 16px;
+  transition: transform 0.2s var(--ease-premium), box-shadow 0.2s var(--ease-premium);
+  will-change: transform;
+}
+
+.insight-card:hover {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  transform: translateY(-3px) scale(1.01);
+}
+
+.insight-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.insight-category {
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--purple-100);
+  color: var(--purple-700);
+}
+
+.insight-time {
+  font-size: 0.75rem;
+  color: var(--gray-400);
+}
+
+.insight-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+
+.insight-text {
+  font-size: 0.88rem;
+  color: var(--gray-600);
+  line-height: 1.7;
+}
+
+

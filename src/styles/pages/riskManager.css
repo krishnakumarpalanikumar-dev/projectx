@@ -1,0 +1,534 @@
+/* ============================================
+   Risk Manager Page — Polished Layout
+   ============================================ */
+
+/* ── Page Layout ──────────────────────────── */
+.risk-manager-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Alert Bar ────────────────────────────── */
+.rm-alert-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 24px;
+  border-radius: var(--radius-lg);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  animation: rmSlideDown 0.4s ease;
+}
+
+@keyframes rmSlideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rm-alert-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.rm-alert-safe {
+  background: linear-gradient(135deg, rgba(5,150,105,0.08), rgba(5,150,105,0.15));
+  border: 1px solid rgba(5,150,105,0.25);
+  color: var(--gray-700);
+}
+
+.rm-alert-warning {
+  background: linear-gradient(135deg, rgba(217,119,6,0.08), rgba(217,119,6,0.18));
+  border: 1px solid rgba(217,119,6,0.3);
+  color: var(--gray-700);
+}
+
+.rm-alert-danger {
+  background: linear-gradient(135deg, rgba(220,38,38,0.08), rgba(220,38,38,0.18));
+  border: 1px solid rgba(220,38,38,0.3);
+  color: var(--gray-700);
+}
+
+/* ── Two Column Grid ─────────────────────── */
+.rm-grid {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.rm-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rm-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rm-card {
+  position: relative;
+}
+
+/* ── Form Styling ─────────────────────────── */
+.rm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.rm-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.rm-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rm-form .form-group label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rm-form .form-group input,
+.rm-form .form-group select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  color: var(--gray-800);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+  box-sizing: border-box;
+  height: 42px;
+}
+
+.rm-form .form-group input:focus,
+.rm-form .form-group select:focus {
+  border-color: var(--purple-400);
+  box-shadow: 0 0 0 3px rgba(30,58,138,0.08);
+}
+
+/* Save / Calculate Buttons */
+.rm-save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 20px;
+  background: var(--gradient-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease-premium), box-shadow 0.2s var(--ease-premium);
+  box-shadow: var(--shadow-btn-primary);
+  margin-top: 4px;
+}
+
+.rm-save-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(30,58,138,0.35);
+}
+
+.rm-save-btn:active {
+  transform: scale(0.97);
+}
+
+.rm-calc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 20px;
+  background: var(--gray-50);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-premium);
+  margin-top: 4px;
+}
+
+.rm-calc-btn:hover {
+  background: var(--purple-50);
+  border-color: var(--purple-300);
+  color: var(--purple-700);
+  transform: translateY(-1px);
+}
+
+.rm-calc-btn:active {
+  transform: scale(0.97);
+}
+
+/* Simulator Row */
+.rm-sim-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 16px;
+}
+
+.rm-sim-row .form-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rm-sim-row .form-group label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rm-sim-row .form-group input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  color: var(--gray-800);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+  box-sizing: border-box;
+  height: 42px;
+}
+
+.rm-sim-row .form-group input:focus {
+  border-color: var(--purple-400);
+  box-shadow: 0 0 0 3px rgba(30,58,138,0.08);
+}
+
+.rm-sim-btn {
+  height: 42px;
+  padding: 0 20px;
+  white-space: nowrap;
+  background: #1E3A8A;
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-premium);
+  box-shadow: var(--shadow-btn-primary);
+  flex-shrink: 0;
+}
+
+.rm-sim-btn:hover {
+  background: #3B82F6;
+  transform: translateY(-1px);
+}
+
+.rm-sim-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Stats Row (Dashboard) ────────────────── */
+.rm-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.rm-stat {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: 18px 16px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.rm-stat:hover {
+  border-color: var(--purple-200);
+}
+
+.rm-stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-500);
+  margin-bottom: 8px;
+}
+
+.rm-stat-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--gray-900);
+  letter-spacing: -0.02em;
+}
+
+.rm-stat-sub {
+  font-size: 0.78rem;
+  color: var(--gray-400);
+  margin-top: 4px;
+}
+
+/* ── Daily Loss Meter ─────────────────────── */
+.rm-meter-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+}
+
+.rm-meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.rm-meter-value.safe { color: var(--success); }
+.rm-meter-value.warning { color: var(--warning); }
+.rm-meter-value.danger { color: var(--danger); }
+
+.rm-meter-track {
+  width: 100%;
+  height: 14px;
+  background: var(--gray-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.rm-meter-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.6s ease, background 0.3s ease;
+  position: relative;
+}
+
+.rm-meter-fill.safe { background: linear-gradient(90deg, #059669, #34d399); }
+.rm-meter-fill.warning { background: linear-gradient(90deg, #d97706, #fbbf24); }
+.rm-meter-fill.danger { background: linear-gradient(90deg, #dc2626, #f87171); }
+
+.rm-meter-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--gray-400);
+}
+
+/* ── Info Grid (Quick Stats) ──────────────── */
+.rm-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.rm-info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.rm-info-item:hover {
+  border-color: var(--purple-300);
+  box-shadow: var(--shadow-sm);
+}
+
+.rm-info-item svg {
+  color: var(--purple-500);
+  flex-shrink: 0;
+}
+
+.rm-info-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rm-info-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+/* ── Calc Output ──────────────────────────── */
+.rm-calc-output {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  animation: fadeIn 0.3s ease;
+}
+
+.rm-calc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.rm-calc-header.long {
+  background: linear-gradient(135deg, rgba(5,150,105,0.1), rgba(5,150,105,0.2));
+  color: var(--success);
+}
+
+.rm-calc-header.short {
+  background: linear-gradient(135deg, rgba(220,38,38,0.1), rgba(220,38,38,0.2));
+  color: var(--danger);
+}
+
+.rm-calc-risk {
+  font-size: 0.82rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.rm-calc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--gray-200);
+}
+
+.rm-calc-item {
+  padding: 14px 18px;
+  background: white;
+}
+
+.rm-calc-item.highlight {
+  background: linear-gradient(135deg, var(--purple-50), var(--purple-100));
+}
+
+.rm-calc-item-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.rm-calc-item-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+.rm-calc-item-value.sell {
+  color: var(--danger);
+}
+
+/* ── Trade Log ────────────────────────────── */
+.rm-log-header-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-400);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.rm-log-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 10px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--gray-100);
+  transition: background var(--transition-fast);
+}
+
+.rm-log-row:last-child {
+  border-bottom: none;
+}
+
+.rm-log-row:hover {
+  background: var(--gray-50);
+}
+
+.rm-log-date {
+  color: var(--gray-600);
+  font-weight: 500;
+}
+
+.rm-log-loss {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.rm-log-balance {
+  color: var(--gray-700);
+  font-weight: 600;
+}
+
+/* ── Responsive ───────────────────────────── */
+@media (max-width: 1100px) {
+  .rm-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .rm-stats-row {
+    grid-template-columns: 1fr;
+  }
+  .rm-info-grid {
+    grid-template-columns: 1fr;
+  }
+  .rm-form .form-row {
+    grid-template-columns: 1fr;
+  }
+  .rm-sim-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 600px) {
+  .rm-calc-grid {
+    grid-template-columns: 1fr;
+  }
+}

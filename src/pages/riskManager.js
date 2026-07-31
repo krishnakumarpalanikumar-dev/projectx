@@ -88,41 +88,45 @@ export function renderRiskManager(container) {
               <span class="card-badge badge-purple">Core</span>
             </div>
             <div class="rm-form">
-              <div class="form-group">
-                <label for="rm-balance">Account Balance ($)</label>
-                <input type="number" id="rm-balance" value="${s.accountBalance}" min="100" step="100" />
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="rm-balance">Account Balance ($)</label>
+                  <input type="number" id="rm-balance" value="${s.accountBalance}" min="100" step="100" />
+                </div>
+                <div class="form-group">
+                  <label for="rm-risk-pct">Risk Per Trade (%)</label>
+                  <select id="rm-risk-pct">
+                    <option value="0.25" ${s.riskPercent === 0.25 ? 'selected' : ''}>0.25% (Ultra Safe)</option>
+                    <option value="0.5" ${s.riskPercent === 0.5 ? 'selected' : ''}>0.5% (Conservative)</option>
+                    <option value="1" ${s.riskPercent === 1 ? 'selected' : ''}>1% (Recommended)</option>
+                    <option value="1.5" ${s.riskPercent === 1.5 ? 'selected' : ''}>1.5% (Moderate)</option>
+                    <option value="2" ${s.riskPercent === 2 ? 'selected' : ''}>2% (Aggressive)</option>
+                    <option value="3" ${s.riskPercent === 3 ? 'selected' : ''}>3% (High Risk)</option>
+                  </select>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="rm-risk-pct">Risk Per Trade (%)</label>
-                <select id="rm-risk-pct">
-                  <option value="0.25" ${s.riskPercent === 0.25 ? 'selected' : ''}>0.25% (Ultra Safe)</option>
-                  <option value="0.5" ${s.riskPercent === 0.5 ? 'selected' : ''}>0.5% (Conservative)</option>
-                  <option value="1" ${s.riskPercent === 1 ? 'selected' : ''}>1% (Recommended)</option>
-                  <option value="1.5" ${s.riskPercent === 1.5 ? 'selected' : ''}>1.5% (Moderate)</option>
-                  <option value="2" ${s.riskPercent === 2 ? 'selected' : ''}>2% (Aggressive)</option>
-                  <option value="3" ${s.riskPercent === 3 ? 'selected' : ''}>3% (High Risk)</option>
-                </select>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="rm-max-daily">Max Daily Loss (%)</label>
+                  <select id="rm-max-daily">
+                    <option value="1" ${s.maxDailyLoss === 1 ? 'selected' : ''}>1% (Very Strict)</option>
+                    <option value="2" ${s.maxDailyLoss === 2 ? 'selected' : ''}>2% (Strict)</option>
+                    <option value="3" ${s.maxDailyLoss === 3 ? 'selected' : ''}>3% (Standard)</option>
+                    <option value="5" ${s.maxDailyLoss === 5 ? 'selected' : ''}>5% (Relaxed)</option>
+                    <option value="10" ${s.maxDailyLoss === 10 ? 'selected' : ''}>10% (Dangerous)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="rm-max-trades">Max Open Trades</label>
+                  <select id="rm-max-trades">
+                    <option value="1" ${s.maxOpenTrades === 1 ? 'selected' : ''}>1</option>
+                    <option value="2" ${s.maxOpenTrades === 2 ? 'selected' : ''}>2</option>
+                    <option value="3" ${s.maxOpenTrades === 3 ? 'selected' : ''}>3</option>
+                    <option value="5" ${s.maxOpenTrades === 5 ? 'selected' : ''}>5</option>
+                  </select>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="rm-max-daily">Max Daily Loss (%)</label>
-                <select id="rm-max-daily">
-                  <option value="1" ${s.maxDailyLoss === 1 ? 'selected' : ''}>1% (Very Strict)</option>
-                  <option value="2" ${s.maxDailyLoss === 2 ? 'selected' : ''}>2% (Strict)</option>
-                  <option value="3" ${s.maxDailyLoss === 3 ? 'selected' : ''}>3% (Standard)</option>
-                  <option value="5" ${s.maxDailyLoss === 5 ? 'selected' : ''}>5% (Relaxed)</option>
-                  <option value="10" ${s.maxDailyLoss === 10 ? 'selected' : ''}>10% (Dangerous)</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="rm-max-trades">Max Open Trades</label>
-                <select id="rm-max-trades">
-                  <option value="1" ${s.maxOpenTrades === 1 ? 'selected' : ''}>1</option>
-                  <option value="2" ${s.maxOpenTrades === 2 ? 'selected' : ''}>2</option>
-                  <option value="3" ${s.maxOpenTrades === 3 ? 'selected' : ''}>3</option>
-                  <option value="5" ${s.maxOpenTrades === 5 ? 'selected' : ''}>5</option>
-                </select>
-              </div>
-              <button class="btn btn-primary rm-save-btn" id="rm-save-settings" style="width:100%;margin-top:8px;">
+              <button class="rm-save-btn" id="rm-save-settings">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                 Save Settings
               </button>
@@ -135,15 +139,17 @@ export function renderRiskManager(container) {
               <span class="card-title">📐 Position Size Calculator</span>
             </div>
             <div class="rm-form">
-              <div class="form-group">
-                <label for="rm-entry">Entry Price</label>
-                <input type="number" id="rm-entry" placeholder="e.g. 1.0850" step="any" />
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="rm-entry">Entry Price</label>
+                  <input type="number" id="rm-entry" placeholder="e.g. 1.0850" step="any" />
+                </div>
+                <div class="form-group">
+                  <label for="rm-sl">Stop Loss Price</label>
+                  <input type="number" id="rm-sl" placeholder="e.g. 1.0810" step="any" />
+                </div>
               </div>
-              <div class="form-group">
-                <label for="rm-sl">Stop Loss Price</label>
-                <input type="number" id="rm-sl" placeholder="e.g. 1.0810" step="any" />
-              </div>
-              <button class="analyze-btn" id="rm-calc-btn" style="margin-top:4px;">
+              <button class="rm-calc-btn" id="rm-calc-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
                 Calculate Position Size
               </button>
@@ -240,12 +246,12 @@ export function renderRiskManager(container) {
             <p style="font-size:0.82rem;color:var(--gray-500);margin-bottom:16px;line-height:1.6;">
               Log a simulated trade loss to test how the daily loss blocker works. Once you hit your daily limit, the Risk Manager will block further trades.
             </p>
-            <div class="rm-form" style="display:flex;gap:12px;align-items:flex-end;">
-              <div class="form-group" style="flex:1;">
+            <div class="rm-sim-row">
+              <div class="form-group">
                 <label for="rm-sim-loss">Simulated Loss ($)</label>
                 <input type="number" id="rm-sim-loss" placeholder="e.g. 100" min="0" step="10" />
               </div>
-              <button class="btn btn-primary" id="rm-log-loss" style="height:42px;white-space:nowrap;padding:0 20px;" ${isBlocked ? 'disabled' : ''}>
+              <button class="rm-sim-btn" id="rm-log-loss" ${isBlocked ? 'disabled' : ''}>
                 Log Loss
               </button>
             </div>

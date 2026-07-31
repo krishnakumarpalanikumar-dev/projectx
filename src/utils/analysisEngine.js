@@ -217,29 +217,42 @@ export async function generateSignals(marketType) {
 function determineTrend(imageAnalysis, pair, timeframe) {
   const { trend, candleRatio, colors } = imageAnalysis;
   
-  // Combine image-based trend with candle color analysis
+  // The image analyzer now returns a multi-factor consensus — trust it directly
   let direction = trend.direction;
   let strength = trend.strength;
   
-  // If candle colors strongly disagree with pixel trend, use candle colors
-  if (candleRatio.dominance === 'bullish' && trend.direction === 'bearish' && Math.abs(trend.slope) < 0.15) {
-    direction = 'sideways';
+  // Only override if candle colors STRONGLY disagree AND slope is nearly zero
+  // This prevents the old bug where any disagreement forced "sideways/weak"
+  if (candleRatio.dominance === 'bullish' && trend.direction === 'bearish' && Math.abs(trend.slope) < 0.03) {
+    // Conflicting signals with nearly flat slope — let candle colors win
+    direction = 'bullish';
     strength = 'weak';
-  } else if (candleRatio.dominance === 'bearish' && trend.direction === 'bullish' && Math.abs(trend.slope) < 0.15) {
-    direction = 'sideways';
+  } else if (candleRatio.dominance === 'bearish' && trend.direction === 'bullish' && Math.abs(trend.slope) < 0.03) {
+    direction = 'bearish';
     strength = 'weak';
+  }
+  
+  // If still sideways but candle colors have a clear dominance, use that
+  if (direction === 'sideways' && candleRatio.totalCandlePixels > 50) {
+    if (candleRatio.dominance === 'bullish') {
+      direction = 'bullish';
+      strength = 'weak';
+    } else if (candleRatio.dominance === 'bearish') {
+      direction = 'bearish';
+      strength = 'weak';
+    }
   }
   
   const descriptions = {
     bullish: {
       strong: `${pair} shows a strong uptrend on the ${timeframe} chart. Price is making consistent higher highs and higher lows, indicating strong buying pressure. The bullish momentum appears well-established with buyers firmly in control.`,
       moderate: `${pair} displays moderate bullish momentum on the ${timeframe} timeframe. The uptrend is present but showing some hesitation. Higher highs are being formed but with decreasing velocity, suggesting the trend may be maturing.`,
-      weak: `${pair} has a slight bullish bias on the ${timeframe} chart. The upward movement is tentative with mixed signals. Consider waiting for stronger confirmation before committing to long positions.`
+      weak: `${pair} has a slight bullish bias on the ${timeframe} chart. The upward movement is tentative with mixed signals. A cautious long position may be considered with tight risk management.`
     },
     bearish: {
       strong: `${pair} is in a strong downtrend on the ${timeframe} chart. Price is making consistent lower lows and lower highs, indicating heavy selling pressure. Bears are firmly in control with strong downward momentum.`,
       moderate: `${pair} shows moderate bearish pressure on the ${timeframe} timeframe. The downtrend is active but sellers are facing some resistance. Lower lows are forming but momentum may be slowing.`,
-      weak: `${pair} has a slight bearish bias on the ${timeframe} chart. The downward movement is mild with potential for reversal. Look for confirmation signals before taking short positions.`
+      weak: `${pair} has a slight bearish bias on the ${timeframe} chart. The downward movement is mild with potential for reversal. A cautious short position may be considered with tight stops.`
     },
     sideways: {
       strong: `${pair} is range-bound on the ${timeframe} chart. Price is oscillating within a defined range without clear directional bias. Wait for a breakout with volume confirmation.`,
@@ -378,23 +391,43 @@ function generateTradeSignals(imageAnalysis, trend, sr, pair, timeframe) {
   const { candleRatio, volatility } = imageAnalysis;
   const tfContext = TIMEFRAME_CONTEXT[timeframe] || TIMEFRAME_CONTEXT['1h'];
   
-  // Determine recommendation
+  // Multi-factor signal determination — much more aggressive about giving BUY/SELL
   let recommendation, confidence;
   
-  if (trend.direction === 'bullish' && trend.strength !== 'weak') {
+  if (trend.direction === 'bullish') {
     recommendation = 'BUY';
-    confidence = trend.strength === 'strong' ? 'high' : 'medium';
-  } else if (trend.direction === 'bearish' && trend.strength !== 'weak') {
+    if (trend.strength === 'strong') confidence = 'high';
+    else if (trend.strength === 'moderate') confidence = 'medium';
+    else confidence = 'low'; // weak bullish = BUY with low confidence, NOT HOLD
+  } else if (trend.direction === 'bearish') {
     recommendation = 'SELL';
-    confidence = trend.strength === 'strong' ? 'high' : 'medium';
+    if (trend.strength === 'strong') confidence = 'high';
+    else if (trend.strength === 'moderate') confidence = 'medium';
+    else confidence = 'low'; // weak bearish = SELL with low confidence, NOT HOLD
   } else {
-    recommendation = 'HOLD';
-    confidence = 'low';
+    // True sideways — still try to give a directional signal based on candle ratio
+    if (candleRatio.dominance === 'bullish' && candleRatio.greenRatio > 0.55) {
+      recommendation = 'BUY';
+      confidence = 'low';
+    } else if (candleRatio.dominance === 'bearish' && candleRatio.redRatio > 0.55) {
+      recommendation = 'SELL';
+      confidence = 'low';
+    } else {
+      recommendation = 'HOLD';
+      confidence = 'low';
+    }
   }
   
-  // Adjust confidence based on candle ratio agreement
-  if ((recommendation === 'BUY' && candleRatio.dominance === 'bearish') ||
-      (recommendation === 'SELL' && candleRatio.dominance === 'bullish')) {
+  // Boost confidence if candle ratio AGREES with recommendation
+  if ((recommendation === 'BUY' && candleRatio.dominance === 'bullish') ||
+      (recommendation === 'SELL' && candleRatio.dominance === 'bearish')) {
+    if (confidence === 'low') confidence = 'medium';
+    else if (confidence === 'medium') confidence = 'high';
+  }
+  
+  // Only downgrade if strongly contradicted — don't drop to HOLD, just lower confidence
+  if ((recommendation === 'BUY' && candleRatio.dominance === 'bearish' && candleRatio.redRatio > 0.65) ||
+      (recommendation === 'SELL' && candleRatio.dominance === 'bullish' && candleRatio.greenRatio > 0.65)) {
     confidence = 'low';
   }
   
@@ -404,24 +437,19 @@ function generateTradeSignals(imageAnalysis, trend, sr, pair, timeframe) {
   
   let entry, sl, tp1, tp2, tp3, rr;
   
-  if (recommendation === 'BUY') {
+  if (recommendation === 'BUY' || (recommendation === 'HOLD' && rng() > 0.5)) {
+    // For HOLD we still calculate BUY-side levels as fallback
     entry = supports[0] + (resistances[0] - supports[0]) * (0.3 + rng() * 0.2);
     sl = supports[1] || supports[0] * 0.995;
     tp1 = resistances[0];
     tp2 = resistances[1] || resistances[0] * 1.005;
     tp3 = resistances[2] || resistances[0] * 1.01;
-  } else if (recommendation === 'SELL') {
+  } else if (recommendation === 'SELL' || recommendation === 'HOLD') {
     entry = resistances[0] - (resistances[0] - supports[0]) * (0.3 + rng() * 0.2);
     sl = resistances[1] || resistances[0] * 1.005;
     tp1 = supports[0];
     tp2 = supports[1] || supports[0] * 0.995;
     tp3 = supports[2] || supports[0] * 0.99;
-  } else {
-    entry = (supports[0] + resistances[0]) / 2;
-    sl = supports[1] || supports[0];
-    tp1 = resistances[0];
-    tp2 = resistances[1] || resistances[0];
-    tp3 = resistances[2] || resistances[0];
   }
   
   const risk = Math.abs(entry - sl);
@@ -649,4 +677,21 @@ function generateStockInsights(rng) {
   const count = 2 + Math.floor(rng() * 2);
   const shuffled = allInsights.sort(() => rng() - 0.5);
   return shuffled.slice(0, count);
+}
+
+// ============================================
+// Worker-Ready Pattern
+// Single entry point for future Web Worker migration
+// ============================================
+export async function processWorkerTask(taskName, payload) {
+  switch (taskName) {
+    case 'analyzeChart':
+      return await analyzeChart(payload.imageBase64, payload.mimeType, payload.pair, payload.timeframe, payload.currentPrice);
+    case 'getMarketInsights':
+      return await getMarketInsights(payload.topic);
+    case 'generateSignals':
+      return await generateSignals(payload.marketType);
+    default:
+      throw new Error(`Unknown task: ${taskName}`);
+  }
 }

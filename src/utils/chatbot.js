@@ -588,3 +588,22 @@ function buildContextualResponse(msg) {
     "• \"Help\" — see all topics\n\n" +
     "Try asking in a different way! 🤔";
 }
+
+// ============================================
+// Worker-Ready Pattern
+// Single entry point for future Web Worker migration
+// ============================================
+export async function processWorkerTask(taskName, payload) {
+  switch (taskName) {
+    case 'processMessage':
+      return processMessage(payload.userMessage);
+    case 'setChatAnalysis':
+      setChatAnalysis(payload.analysis);
+      return true;
+    case 'clearChatHistory':
+      clearChatHistory();
+      return true;
+    default:
+      throw new Error(`Unknown task: ${taskName}`);
+  }
+}
