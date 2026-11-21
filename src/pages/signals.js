@@ -32,12 +32,32 @@ export function renderSignals(container) {
 
   let currentTab = 'forex';
 
+  const showStocksNotice = () => {
+    const signalsContainer = document.getElementById('signals-container');
+    signalsContainer.innerHTML = `
+      <div class="card" style="border:1.5px solid var(--warning, #f59e0b);background:#fffbeb;padding:40px 24px;text-align:center;">
+        <div style="font-size:2.8rem;margin-bottom:12px;">📈</div>
+        <h3 style="color:var(--gray-800);margin-bottom:8px;font-size:1.2rem;">Stocks Live Data</h3>
+        <p style="color:var(--gray-600);font-size:0.95rem;max-width:480px;margin:0 auto 16px;">
+          Coming soon — not yet connected to live data.
+        </p>
+        <span style="font-size:0.82rem;color:var(--gray-500);background:#fef3c7;padding:4px 12px;border-radius:20px;">
+          Currently supported: EUR/USD, XAU/USD, GBP/USD, USD/JPY, AUD/USD, BTC/USDT
+        </span>
+      </div>
+    `;
+  };
+
   // Tab switching
   document.querySelectorAll('[data-signal-tab]').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('[data-signal-tab]').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       currentTab = tab.dataset.signalTab;
+
+      if (currentTab === 'stocks') {
+        showStocksNotice();
+      }
     });
   });
 
@@ -45,6 +65,12 @@ export function renderSignals(container) {
   document.getElementById('generate-signals-btn').addEventListener('click', async () => {
     const btn = document.getElementById('generate-signals-btn');
     const signalsContainer = document.getElementById('signals-container');
+
+    if (currentTab === 'stocks') {
+      showStocksNotice();
+      showToast('Stocks live data coming soon — please select Forex or Crypto.', 'info');
+      return;
+    }
 
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner"></div> Generating...';
@@ -63,10 +89,11 @@ export function renderSignals(container) {
     } catch (error) {
       showToast(`Failed: ${error.message}`, 'error');
       signalsContainer.innerHTML = `
-        <div class="card">
+        <div class="card" style="border:1.5px solid var(--danger);background:#fef2f2;">
           <div class="empty-state">
-            <h3>Generation Failed</h3>
-            <p>${error.message}</p>
+            <div style="font-size:2.2rem;margin-bottom:8px;">⚠️</div>
+            <h3 style="color:var(--danger);margin-bottom:8px;">Market Data Unavailable</h3>
+            <p style="color:var(--gray-700);">Unable to retrieve analysis from Twelve Data: ${error.message}</p>
           </div>
         </div>
       `;
@@ -93,14 +120,21 @@ function displaySignals(signals, container) {
     return;
   }
 
-  container.innerHTML = signals.map((signal, i) => `
-    <div class="card signal-card ${signal.type === 'BUY' ? 'buy-signal' : 'sell-signal'}" style="margin-bottom:16px;animation:slideUp 0.3s ease ${i * 0.1}s both;">
+  container.innerHTML = signals.map((signal, i) => {
+    const isBuy = (signal.type || '').includes('BUY');
+    const isSell = (signal.type || '').includes('SELL');
+    const cardClass = isBuy ? 'buy-signal' : isSell ? 'sell-signal' : 'hold-signal';
+    const typeClass = isBuy ? 'buy' : isSell ? 'sell' : 'neutral';
+    const typeIcon = isBuy ? '🟢' : isSell ? '🔴' : '🟡';
+
+    return `
+    <div class="card signal-card ${cardClass}" style="margin-bottom:16px;animation:slideUp 0.3s ease ${i * 0.1}s both;">
       <div class="signal-header">
         <div style="display:flex;align-items:center;gap:12px;">
           <span class="signal-pair">${signal.pair}</span>
           <span class="card-badge badge-purple">${signal.timeframe || 'N/A'}</span>
         </div>
-        <span class="signal-type ${signal.type === 'BUY' ? 'buy' : 'sell'}">${signal.type}</span>
+        <span class="signal-type ${typeClass}">${typeIcon} ${signal.type}</span>
       </div>
       <div class="signal-details">
         <div class="signal-detail">
@@ -117,10 +151,11 @@ function displaySignals(signals, container) {
         </div>
         <div class="signal-detail">
           <div class="signal-detail-label">Confidence</div>
-          <div class="signal-detail-value" style="text-transform:capitalize;">${signal.confidence || 'N/A'}</div>
+          <div class="signal-detail-value" style="text-transform:capitalize;">${signal.confidence || 'N/A'}${signal.confidence_pct ? ` (${signal.confidence_pct}%)` : ''}</div>
         </div>
       </div>
       ${signal.reason ? `<p style="margin-top:14px;font-size:0.84rem;color:var(--gray-500);line-height:1.6;">💡 <strong>Reason:</strong> ${signal.reason}</p>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }

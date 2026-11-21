@@ -3,6 +3,7 @@
 // ============================================
 
 import { showToast } from '../utils/toast.js';
+import { STORAGE_KEYS, storage } from '../utils/storage.js';
 
 
 let cachedTrades = [];
@@ -57,8 +58,8 @@ export function renderTradeJournal(container) {
   container.innerHTML = `<div style="padding: 40px; text-align: center;">Loading journal data...</div>`;
   
   try {
-    const stored = localStorage.getItem('tv_trades');
-    cachedTrades = stored ? JSON.parse(stored) : [];
+    const stored = storage.get(STORAGE_KEYS.TRADE_JOURNAL);
+    cachedTrades = Array.isArray(stored) ? stored : [];
   } catch (err) {
     showToast('Failed to load trades', 'error');
     cachedTrades = [];
@@ -249,7 +250,7 @@ function renderTradeList() {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
       cachedTrades = cachedTrades.filter(t => t._id !== id);
-      localStorage.setItem('tv_trades', JSON.stringify(cachedTrades));
+      storage.set(STORAGE_KEYS.TRADE_JOURNAL, cachedTrades);
       showToast('Trade deleted', 'info');
       const container = document.getElementById('page-container');
       if (container) renderTradeJournal(container);
@@ -277,7 +278,7 @@ function initJournalEvents() {
 
     const trade = { _id: Date.now().toString(), pair, direction, entry, exit, pnl, notes, date: new Date().toISOString() };
     cachedTrades.unshift(trade);
-    localStorage.setItem('tv_trades', JSON.stringify(cachedTrades));
+    storage.set(STORAGE_KEYS.TRADE_JOURNAL, cachedTrades);
     showToast(`Trade logged: ${pair} ${direction}`, 'success');
     
     const container = document.getElementById('page-container');

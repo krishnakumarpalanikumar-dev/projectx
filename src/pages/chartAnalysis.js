@@ -100,7 +100,7 @@ export function renderChartAnalysis(container) {
               </div>
               <div class="form-group">
                 <label for="pair-input">Trading Pair</label>
-                <input type="text" id="pair-input" list="pair-options" placeholder="e.g., EUR/USD, BTC/USDT, AAPL" />
+                <input type="text" id="pair-input" list="pair-options" placeholder="e.g., EUR/USD, XAU/USD, BTC/USDT" />
                 <datalist id="pair-options"></datalist>
               </div>
             </div>
@@ -222,46 +222,79 @@ function initPairDropdown() {
   const marketType = document.getElementById('market-type');
   const datalist = document.getElementById('pair-options');
   const pairInput = document.getElementById('pair-input');
+  const analyzeBtn = document.getElementById('analyze-btn');
 
+  // Only the 6 supported pairs from backend Twelve Data integration
   const options = {
-    forex: [
-      'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD',
-      'EUR/GBP', 'EUR/JPY', 'GBP/JPY', 'AUD/JPY', 'EUR/AUD', 'EUR/CHF', 'GBP/CHF',
-      'AUD/CAD', 'AUD/CHF', 'AUD/NZD', 'CAD/CHF', 'CAD/JPY', 'CHF/JPY', 'EUR/CAD'
-    ],
-    crypto: [
-      'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT', 'ADA/USDT', 
-      'DOGE/USDT', 'DOT/USDT', 'AVAX/USDT', 'LINK/USDT', 'MATIC/USDT', 'LTC/USDT',
-      'UNI/USDT', 'BCH/USDT', 'XLM/USDT', 'ALGO/USDT', 'VET/USDT', 'ICP/USDT'
-    ],
-    stocks: [
-      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'JPM', 'V', 'WMT', 
-      'NFLX', 'AMD', 'INTC', 'BA', 'DIS', 'BAC', 'CSCO', 'PEP', 'KO', 'MCD'
-    ]
+    forex: ['EUR/USD', 'XAU/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD'],
+    crypto: ['BTC/USDT'],
+    stocks: []
   };
+
+  // Status notice element for coming-soon markets
+  let noticeEl = document.getElementById('stocks-notice');
+  if (!noticeEl && pairInput && pairInput.parentElement) {
+    noticeEl = document.createElement('div');
+    noticeEl.id = 'stocks-notice';
+    noticeEl.style.fontSize = '0.8rem';
+    noticeEl.style.marginTop = '6px';
+    noticeEl.style.display = 'none';
+    pairInput.parentElement.appendChild(noticeEl);
+  }
 
   function updateOptions() {
     const type = marketType.value;
     datalist.innerHTML = '';
     
-    if (options[type]) {
-      options[type].forEach(pair => {
-        const option = document.createElement('option');
-        option.value = pair;
-        datalist.appendChild(option);
-      });
-    }
-    
-    // Clear input when switching markets if it doesn't match the new type
-    if (pairInput.value && !options[type].includes(pairInput.value)) {
+    if (type === 'stocks') {
       pairInput.value = '';
-      pairInput.placeholder = type === 'forex' ? 'e.g., EUR/USD' : 
-                              type === 'crypto' ? 'e.g., BTC/USDT' : 'e.g., AAPL';
+      pairInput.placeholder = 'Coming soon — not yet connected to live data';
+      pairInput.disabled = true;
+      if (noticeEl) {
+        noticeEl.style.display = 'block';
+        noticeEl.style.color = '#f59e0b';
+        noticeEl.innerHTML = '⚠️ <strong>Stocks:</strong> Coming soon — not yet connected to live data.';
+      }
+      if (analyzeBtn && !uploadedImage) {
+        analyzeBtn.disabled = true;
+      }
+    } else {
+      pairInput.disabled = false;
+      if (noticeEl) {
+        noticeEl.style.display = 'none';
+      }
+      if (options[type]) {
+        options[type].forEach(pair => {
+          const option = document.createElement('option');
+          option.value = pair;
+          datalist.appendChild(option);
+        });
+      }
+      
+      // Clear input when switching markets if it doesn't match the new type
+      if (pairInput.value && !options[type].includes(pairInput.value)) {
+        pairInput.value = '';
+      }
+      pairInput.placeholder = type === 'forex' ? 'e.g., EUR/USD, XAU/USD' : 'e.g., BTC/USDT';
     }
   }
 
   marketType.addEventListener('change', updateOptions);
-  
+
+  const checkBtnState = () => {
+    const btn = document.getElementById('analyze-btn');
+    if (btn) {
+      if (marketType.value === 'stocks' && !uploadedImage) {
+        btn.disabled = true;
+      } else if (pairInput.value.trim() || uploadedImage) {
+        btn.disabled = false;
+      }
+    }
+  };
+
+  pairInput.addEventListener('input', checkBtnState);
+  pairInput.addEventListener('change', checkBtnState);
+
   // Initial populate
   updateOptions();
 }
@@ -305,10 +338,11 @@ function restoreSessionState() {
     }
   }
 
-  // Re-enable analyse button if image is present
-  if (uploadedImage) {
-    const btn = document.getElementById('analyze-btn');
-    if (btn) btn.disabled = false;
+  // Re-enable analyse button if image or pair is present
+  const btn = document.getElementById('analyze-btn');
+  const pairEl = document.getElementById('pair-input');
+  if (btn && (uploadedImage || (pairEl && pairEl.value.trim()))) {
+    btn.disabled = false;
   }
 
   // Restore analysis results panel
@@ -406,19 +440,20 @@ function initAnalysis() {
   const analyzeBtn = document.getElementById('analyze-btn');
   
   analyzeBtn.addEventListener('click', async () => {
-    if (!uploadedImage) {
-      showToast('Please upload a chart first', 'error');
-      return;
-    }
-
     const pair = document.getElementById('pair-input').value.trim();
+    const marketType = document.getElementById('market-type')?.value;
     const timeframe = document.getElementById('timeframe-select').value;
     const currentPriceRaw = document.getElementById('current-price').value.trim();
     const currentPrice = currentPriceRaw ? parseFloat(currentPriceRaw) : null;
-    const analysisDepth = document.getElementById('analysis-depth')?.value || 'detailed';
+    const analysisDepth = document.getElementById('analysis-depth')?.value || 'standard';
 
-    if (!pair) {
-      showToast('Please enter the trading pair', 'error');
+    if (marketType === 'stocks' && !uploadedImage) {
+      showToast('Stocks live data coming soon — please select Forex or Crypto.', 'info');
+      return;
+    }
+
+    if (!pair && !uploadedImage) {
+      showToast('Please select or enter a trading pair (e.g., EUR/USD)', 'error');
       return;
     }
 
@@ -444,6 +479,7 @@ function initAnalysis() {
     } catch (error) {
       showToast(`Analysis failed: ${error.message}`, 'error');
       console.error('Analysis error:', error);
+      displayAnalysisError(error.message, pair, timeframe);
     } finally {
       analyzeBtn.disabled = false;
       analyzeBtn.innerHTML = `
@@ -452,6 +488,23 @@ function initAnalysis() {
       `;
     }
   });
+}
+
+function displayAnalysisError(errorMsg, pair, timeframe) {
+  const container = document.getElementById('analysis-results-container');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="card" style="border: 1.5px solid var(--danger); background: #fef2f2; padding: 24px; border-radius: var(--radius-lg); text-align: center; animation: slideUp 0.3s ease;">
+      <div style="font-size: 2.2rem; margin-bottom: 10px;">⚠️</div>
+      <h3 style="color: var(--danger); font-size: 1.15rem; font-weight: 700; margin-bottom: 8px;">Market Data Unavailable</h3>
+      <p style="color: var(--gray-700); font-size: 0.9rem; line-height: 1.6; margin-bottom: 12px;">
+        Unable to retrieve analysis from Twelve Data for <strong>${pair || 'the selected market'}</strong> (${timeframe || '1h'}).
+      </p>
+      <div style="display: inline-block; background: white; border: 1px solid rgba(239, 68, 68, 0.2); padding: 8px 14px; border-radius: 6px; font-size: 0.82rem; color: var(--danger);">
+        ${errorMsg || 'Please check Twelve Data API connectivity or rate limits.'}
+      </div>
+    </div>
+  `;
 }
 
 function initChatbot() {
@@ -613,17 +666,17 @@ function displayResults(result, pair, timeframe) {
       <div class="result-body">
         <!-- Signal Strength Meter -->
         <div class="result-section">
-          <div class="signal-strength-card ${result.signals?.recommendation === 'BUY' ? 'buy-bg' : result.signals?.recommendation === 'SELL' ? 'sell-bg' : 'hold-bg'}">
+          <div class="signal-strength-card ${(result.signals?.recommendation || '').includes('BUY') ? 'buy-bg' : (result.signals?.recommendation || '').includes('SELL') ? 'sell-bg' : 'hold-bg'}">
             <div class="signal-strength-header">
               <div class="signal-strength-icon">
-                ${result.signals?.recommendation === 'BUY' ? '🟢' : result.signals?.recommendation === 'SELL' ? '🔴' : '🟡'}
+                ${(result.signals?.recommendation || '').includes('BUY') ? '🟢' : (result.signals?.recommendation || '').includes('SELL') ? '🔴' : '🟡'}
               </div>
               <div>
                 <div class="signal-strength-label">${result.signals?.recommendation || 'HOLD'} SIGNAL</div>
                 <div class="signal-strength-conf">Confidence: ${result.signals?.confidence || 'N/A'}</div>
               </div>
               <div class="signal-meter">
-                <div class="signal-meter-fill" style="width:${signalStrength}%;background:${result.signals?.recommendation === 'BUY' ? 'var(--success)' : result.signals?.recommendation === 'SELL' ? 'var(--danger)' : 'var(--warning)'}"></div>
+                <div class="signal-meter-fill" style="width:${signalStrength}%;background:${(result.signals?.recommendation || '').includes('BUY') ? 'var(--success)' : (result.signals?.recommendation || '').includes('SELL') ? 'var(--danger)' : 'var(--warning)'}"></div>
               </div>
               <span class="signal-meter-value">${signalStrength}%</span>
             </div>
@@ -812,8 +865,8 @@ function buildTradeSetupVisual(result) {
   const tp1 = result.signals?.take_profit_1 || 'N/A';
   const tp2 = result.signals?.take_profit_2 || 'N/A';
   const tp3 = result.signals?.take_profit_3 || 'N/A';
-  const isBuy = result.signals?.recommendation === 'BUY';
-  const isSell = result.signals?.recommendation === 'SELL';
+  const isBuy = (result.signals?.recommendation || '').includes('BUY');
+  const isSell = (result.signals?.recommendation || '').includes('SELL');
 
   return `
     <div class="trade-visual-container">

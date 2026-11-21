@@ -4,8 +4,8 @@
 
 // Pages are now lazily loaded using dynamic imports in navigateTo()
 import { showToast, initToasts } from './utils/toast.js';
-import { getApiKey, setApiKey, hasApiKey } from './utils/storage.js';
-import { setUseBuiltIn, getUseBuiltIn } from './utils/gemini.js';
+import { checkHealth } from './utils/api.js';
+import { STORAGE_KEYS } from './utils/storage.js';
 
 // ============================================
 // State
@@ -46,6 +46,7 @@ async function navigateTo(page) {
     'history': ['Database Backups', 'Your Saved Chart Analyses'],
     'risk-manager': ['Risk Manager', 'Position Sizing & Risk Control'],
     'trade-journal': ['Trade Journal', 'Log, Track & Analyze Your Trades'],
+    'model-tracker': ['Model Tracker', 'Monitor Signal Models & Backtest Accuracy'],
 
     'secret': ['Secret Admin', 'Hidden Admin Area']
   };
@@ -130,6 +131,12 @@ async function navigateTo(page) {
         renderTradeJournal(container); 
         break;
       }
+      case 'model-tracker': {
+        loadPageCSS('modelTracker');
+        const { renderModelTracker } = await import('./pages/modelTracker.js');
+        renderModelTracker(container);
+        break;
+      }
 
 
     }
@@ -149,90 +156,42 @@ function initSettings() {
   const modal = document.getElementById('settings-modal');
   const openBtn = document.getElementById('settings-btn');
   const closeBtn = document.getElementById('settings-close');
-  const saveBtn = document.getElementById('save-api-key');
-  const input = document.getElementById('gemini-api-key');
-  const builtinBtn = document.getElementById('engine-builtin');
-  const geminiBtn = document.getElementById('engine-gemini');
-  const geminiKeySection = document.getElementById('gemini-key-section');
 
-  openBtn.addEventListener('click', () => {
-    modal.classList.add('active');
-    input.value = getApiKey() || '';
-    updateEngineToggleUI();
-  });
+  if (openBtn && modal) {
+    openBtn.addEventListener('click', () => {
+      modal.classList.add('active');
+    });
+  }
 
-  closeBtn.addEventListener('click', () => modal.classList.remove('active'));
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.classList.remove('active');
-  });
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+  }
 
-  // Engine toggle buttons
-  builtinBtn.addEventListener('click', () => {
-    setUseBuiltIn(true);
-    updateEngineToggleUI();
-    updateApiStatus();
-    showToast('Switched to Built-in AI Engine — no API key needed!', 'success');
-  });
-
-  geminiBtn.addEventListener('click', () => {
-    setUseBuiltIn(false);
-    updateEngineToggleUI();
-    updateApiStatus();
-    showToast('Switched to Gemini API — enter your API key below', 'info');
-  });
-
-  saveBtn.addEventListener('click', () => {
-    const key = input.value.trim();
-    if (key) {
-      setApiKey(key);
-      updateApiStatus();
-      showToast('API key saved successfully!', 'success');
-    } else {
-      showToast('Please enter a valid API key', 'error');
-    }
-  });
-}
-
-function updateEngineToggleUI() {
-  const isBuiltIn = getUseBuiltIn();
-  const builtinBtn = document.getElementById('engine-builtin');
-  const geminiBtn = document.getElementById('engine-gemini');
-  const geminiKeySection = document.getElementById('gemini-key-section');
-
-  if (isBuiltIn) {
-    builtinBtn.classList.add('active');
-    builtinBtn.classList.remove('btn-outline');
-    builtinBtn.classList.add('btn-primary');
-    geminiBtn.classList.remove('active');
-    geminiBtn.classList.remove('btn-primary');
-    geminiBtn.classList.add('btn-outline');
-    geminiKeySection.style.display = 'none';
-  } else {
-    geminiBtn.classList.add('active');
-    geminiBtn.classList.remove('btn-outline');
-    geminiBtn.classList.add('btn-primary');
-    builtinBtn.classList.remove('active');
-    builtinBtn.classList.remove('btn-primary');
-    builtinBtn.classList.add('btn-outline');
-    geminiKeySection.style.display = 'block';
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.remove('active');
+    });
   }
 }
 
-function updateApiStatus() {
+async function updateApiStatus() {
   const status = document.getElementById('api-status');
+  if (!status) return;
   const dot = status.querySelector('.api-dot');
   const text = status.querySelector('span');
-  const isBuiltIn = getUseBuiltIn();
   
-  if (isBuiltIn) {
-    dot.classList.add('connected');
-    text.textContent = '🧠 AI Engine Ready';
-  } else if (hasApiKey()) {
-    dot.classList.add('connected');
-    text.textContent = '🌐 Gemini Connected';
-  } else {
+  try {
+    const isHealthy = await checkHealth();
+    if (isHealthy) {
+      dot.classList.add('connected');
+      text.textContent = 'Twelve Data API';
+    } else {
+      dot.classList.remove('connected');
+      text.textContent = 'Backend Offline';
+    }
+  } catch {
     dot.classList.remove('connected');
-    text.textContent = '🌐 API Key Required';
+    text.textContent = 'Backend Offline';
   }
 }
 
@@ -255,22 +214,146 @@ function initMobileMenu() {
   });
 }
 
-
+// ============================================
+// Trade Journal Key Migration (tv_trades -> tradevision_trade_journal)
+// ============================================
+function migrateTradeJournalData() {
+  try {
+    const oldKey = 'tv_trades';
+    const newKey = STORAGE_KEYS.TRADE_JOURNAL;
+    const oldData = localStorage.getItem(oldKey);
+    const newData = localStorage.getItem(newKey);
+    if (oldData && !newData) {
+      localStorage.setItem(newKey, oldData);
+      console.log('Migrated trade journal data from tv_trades to', newKey);
+    }
+  } catch (err) {
+    console.warn('Trade journal migration error:', err);
+  }
+}
 
 // ============================================
 // Init
 // ============================================
 function init() {
+  migrateTradeJournalData();
   initToasts();
   initNavigation();
   initSettings();
   initMobileMenu();
   updateApiStatus();
-
-
-  // (Logo click handler removed as per Phase 1)
+  setInterval(updateApiStatus, 30000);
 
   navigateTo('dashboard');
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ============================================
+// EFFECT 5 — 3D tilt on signal cards
+// ============================================
+function initTiltEffect() {
+  const cards = document.querySelectorAll(
+    '.signal-card, .trade-card, [class*="result-card"], [class*="analysis-card"]'
+  );
+  cards.forEach(card => {
+    card.style.transition = 'transform 0.15s ease';
+    card.style.willChange = 'transform';
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      const rotateX = ((y - cy) / cy) * -6;
+      const rotateY = ((x - cx) / cx) * 6;
+      card.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(4px)`;
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) translateZ(0)';
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initTiltEffect, 500);
+  document.addEventListener('pageChanged', initTiltEffect);
+});
+
+// ============================================
+// EFFECT 9 — Scroll reveal for cards and sections
+// ============================================
+function initScrollReveal() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1 });
+
+  const elements = document.querySelectorAll(
+    '[class*="card"], [class*="panel"], [class*="section"], [class*="result"]'
+  );
+
+  elements.forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(16px)';
+    el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+    observer.observe(el);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initScrollReveal, 300);
+  document.addEventListener('pageChanged', () => {
+    setTimeout(initScrollReveal, 300);
+  });
+});
+
+// ============================================
+// EFFECT 10 — Typewriter effect for AI analysis summary text
+// ============================================
+function typewriterEffect(element, text, speed = 18) {
+  if (!element || !text) return;
+  element.textContent = '';
+  let i = 0;
+  const timer = setInterval(() => {
+    if (i < text.length) {
+      element.textContent += text.charAt(i);
+      i++;
+    } else {
+      clearInterval(timer);
+    }
+  }, speed);
+}
+
+window.typewriterEffect = typewriterEffect;
+
+// ============================================
+// EFFECT 11 — Copy to clipboard micro-interaction
+// ============================================
+function initCopyButtons() {
+  document.querySelectorAll('[data-copy], [class*="copy-btn"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.copy || btn.previousElementSibling?.textContent;
+      if (!text) return;
+      navigator.clipboard.writeText(text.trim()).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.color = '#00B300';
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.style.color = '';
+        }, 1800);
+      });
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initCopyButtons, 500);
+  document.addEventListener('pageChanged', initCopyButtons);
+});

@@ -80,6 +80,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="13" y2="11"/></svg>
           <span>Trade Journal</span>
         </a>
+        <a href="#" class="nav-item" data-page="model-tracker" id="nav-model-tracker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>Model Tracker</span>
+        </a>
 
         <a href="#" class="nav-item" data-page="history" id="nav-history">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11v6a2 2 0 01-2 2H7a2 2 0 01-2-2v-6M3 9l9-7 9 7M12 2v10M12 22v-2"></path></svg>
@@ -90,7 +94,7 @@
       <div class="sidebar-footer">
         <div class="api-status" id="api-status">
           <div class="api-dot connected"></div>
-          <span>AI Engine Ready</span>
+          <span>Twelve Data API</span>
         </div>
         <button class="settings-btn" id="settings-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
@@ -134,32 +138,24 @@
         <button class="modal-close" id="settings-close">&times;</button>
       </div>
       <div class="modal-body">
-        <!-- AI Engine Toggle -->
-        <div class="setting-group" style="margin-bottom:24px;">
-          <label style="font-size:0.95rem;font-weight:700;color:var(--gray-800);margin-bottom:8px;display:block;">AI Analysis Engine</label>
-          <p class="setting-desc" style="margin-bottom:14px;">Choose which AI engine powers your analysis. The built-in engine works offline with no API key needed.</p>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="btn engine-toggle-btn active" id="engine-builtin" style="flex:1;min-width:140px;padding:14px 16px;border-radius:var(--radius-md);font-size:0.85rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;">
-              <span style="font-size:1.3rem;">🧠</span>
-              <span>Built-in AI Engine</span>
-              <span style="font-size:0.72rem;font-weight:400;opacity:0.7;">No API key needed • Instant</span>
-            </button>
-            <button class="btn btn-outline engine-toggle-btn" id="engine-gemini" style="flex:1;min-width:140px;padding:14px 16px;border-radius:var(--radius-md);font-size:0.85rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;">
-              <span style="font-size:1.3rem;">🌐</span>
-              <span>Google Gemini API</span>
-              <span style="font-size:0.72rem;font-weight:400;opacity:0.7;">Requires API key • Cloud</span>
-            </button>
+        <div class="setting-group" style="margin-bottom:20px;">
+          <label style="font-size:0.95rem;font-weight:700;color:var(--gray-800);margin-bottom:8px;display:block;">Market Data Provider</label>
+          <p class="setting-desc" style="margin-bottom:12px;">Live market prices, OHLCV candles, and technical indicators are powered authoritatively by the Twelve Data API via FastAPI backend.</p>
+          <div style="background:var(--surface-light);padding:14px 16px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-weight:600;font-size:0.9rem;color:var(--gray-800);">Twelve Data Backend</div>
+              <div style="font-size:0.75rem;color:var(--gray-500);margin-top:2px;">Configured in backend/.env</div>
+            </div>
+            <span class="card-badge badge-purple">Active</span>
           </div>
         </div>
 
-        <!-- Gemini API Key (shown when Gemini is selected) -->
-        <div class="setting-group" id="gemini-key-section" style="display:none;">
-          <label for="gemini-api-key">Google Gemini API Key</label>
-          <p class="setting-desc">Get your free key at <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>. Note: Free tier has usage limits.</p>
-          <div class="input-row">
-            <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key..." />
-            <button class="btn btn-primary" id="save-api-key">Save</button>
-          </div>
+        <div class="setting-group">
+          <label style="font-size:0.95rem;font-weight:700;color:var(--gray-800);margin-bottom:8px;display:block;">Backend Service</label>
+          <p class="setting-desc" style="font-size:0.84rem;color:var(--gray-500);line-height:1.6;">
+            Connected to FastAPI server at <code style="background:var(--purple-50);color:var(--purple-600);padding:2px 6px;border-radius:4px;font-family:monospace;">http://localhost:8000</code>.
+            Supported pairs: EUR/USD, XAU/USD, GBP/USD, USD/JPY, AUD/USD, BTC/USDT.
+          </p>
         </div>
       </div>
     </div>

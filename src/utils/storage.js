@@ -1,8 +1,6 @@
 // Local Storage Utilities
 
 export const STORAGE_KEYS = {
-  API_KEY: 'tradevision_gemini_key',
-  USE_BUILTIN: 'tradevision_use_builtin',
   HISTORY: 'tradevision_analysis_history',
   RISK_SETTINGS: 'tradevision_risk_settings',
   TRADE_LOG: 'tradevision_trade_log',
@@ -43,24 +41,6 @@ export const storage = {
     localStorage.clear();
   }
 };
-
-// Legacy exports for backward compatibility
-export function getApiKey() {
-  return storage.get(STORAGE_KEYS.API_KEY);
-}
-
-export function setApiKey(key) {
-  storage.set(STORAGE_KEYS.API_KEY, key);
-}
-
-export function hasApiKey() {
-  const key = getApiKey();
-  return key && key.length > 10;
-}
-
-export function removeApiKey() {
-  storage.remove(STORAGE_KEYS.API_KEY);
-}
 
 export function saveAnalysisToHistory(imageData, mimeType, pair, timeframe, analysisResult) {
   const newEntry = {
