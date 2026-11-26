@@ -1,7 +1,7 @@
 """
 TradeVision AI — Market Data Routes
 ====================================
-REST API endpoints for live forex/crypto market data via Twelve Data.
+REST API endpoints for live forex, gold, crypto & stock market data via yfinance.
 """
 
 import sys
@@ -18,6 +18,7 @@ from data_collector import (
     get_ohlc_history,
     get_technical_indicators,
     SUPPORTED_PAIRS,
+    PAIR_DISPLAY_SYMBOLS,
     SUPPORTED_TIMEFRAMES,
     normalize_timeframe,
 )
@@ -42,12 +43,12 @@ async def market_price(pair: str):
     if price is None:
         raise HTTPException(
             status_code=502,
-            detail=f"Unable to retrieve price for {pair} from Twelve Data",
+            detail=f"Unable to retrieve price for {pair} from yfinance",
         )
 
     return {
         "pair": pair,
-        "symbol": SUPPORTED_PAIRS[pair],
+        "symbol": PAIR_DISPLAY_SYMBOLS.get(pair, SUPPORTED_PAIRS[pair]),
         "price": price,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -57,7 +58,7 @@ async def market_price(pair: str):
 @router.get("/ohlc/{pair}")
 async def market_ohlc(
     pair: str,
-    interval: str = Query("1h", description="Candle interval (e.g. 1min, 5min, 15min, 1h, 4h, 1day)"),
+    interval: str = Query("1h", description="Candle interval (e.g. 1m, 5m, 15m, 1h, 4h, 1d)"),
     limit: int = Query(50, ge=1, le=5000, description="Number of candles to return"),
 ):
     """Return OHLCV candle data for a supported trading pair."""
@@ -81,7 +82,7 @@ async def market_ohlc(
     if df is None or df.empty:
         raise HTTPException(
             status_code=502,
-            detail=f"Unable to retrieve OHLC data for {pair} from Twelve Data",
+            detail=f"Unable to retrieve OHLC data for {pair} from yfinance",
         )
 
     # Convert datetime column to string for JSON serialisation
@@ -90,7 +91,7 @@ async def market_ohlc(
 
     return {
         "pair": pair,
-        "symbol": SUPPORTED_PAIRS[pair],
+        "symbol": PAIR_DISPLAY_SYMBOLS.get(pair, SUPPORTED_PAIRS[pair]),
         "interval": norm_interval,
         "count": len(records),
         "candles": records,
@@ -122,16 +123,15 @@ async def market_indicators(
 
     indicators = get_technical_indicators(pair, interval=norm_interval)
 
-    # If all indicators failed, return 502
     if all(v is None for v in indicators.values()):
         raise HTTPException(
             status_code=502,
-            detail=f"Unable to retrieve technical indicators for {pair} from Twelve Data",
+            detail=f"Unable to retrieve technical indicators for {pair} from yfinance",
         )
 
     return {
         "pair": pair,
-        "symbol": SUPPORTED_PAIRS[pair],
+        "symbol": PAIR_DISPLAY_SYMBOLS.get(pair, SUPPORTED_PAIRS[pair]),
         "interval": norm_interval,
         "indicators": indicators,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -143,8 +143,12 @@ async def market_indicators(
 async def market_pairs():
     """Return the list of all supported trading pairs."""
     pairs = [
-        {"key": key, "symbol": symbol}
-        for key, symbol in SUPPORTED_PAIRS.items()
+        {
+            "key": key,
+            "symbol": PAIR_DISPLAY_SYMBOLS.get(key, ticker),
+            "ticker": ticker,
+        }
+        for key, ticker in SUPPORTED_PAIRS.items()
     ]
     return {
         "count": len(pairs),

@@ -3,4 +3,9 @@ uvicorn
 python-dotenv
 requests
 pandas
+numpy
 pillow
+yfinance>=1.8.0
+lightgbm>=4.7.0
+scikit-learn>=1.5.0
+joblib>=1.4.0

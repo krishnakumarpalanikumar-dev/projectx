@@ -1,8 +1,8 @@
 """
 TradeVision AI — Predict Routes
 ================================
-Rule-based trading signal generation powered authoritatively by Twelve Data API.
-No local AI models — pure Twelve Data market indicators and price action logic.
+Hybrid LightGBM ML + technical structure signal generation powered by
+zero-cost yfinance market data.
 """
 
 import sys
@@ -23,12 +23,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from data_collector import (
     get_full_analysis_data,
     get_current_price,
-    get_ohlc_history,
     SUPPORTED_PAIRS,
+    PAIR_DISPLAY_SYMBOLS,
     SUPPORTED_TIMEFRAMES,
     normalize_timeframe,
     calculate_atr,
 )
+from indicators import compute_indicators_df
+from ml_model import predict_setup_probability
 from signal_logic import evaluate_signal, calculate_trade_levels
 
 router = APIRouter()
@@ -52,8 +54,7 @@ class ImageRequest(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @router.post("/analyze")
 async def analyze(req: AnalyzeRequest):
-    """Generate a rule-based trading signal from live Twelve Data
-    indicators (RSI, MACD, EMA-20) and OHLC price action."""
+    """Generate a LightGBM + indicator-confluence trading signal from yfinance data."""
 
     pair = req.pair.upper()
     raw_timeframe = req.timeframe or "1h"
@@ -71,22 +72,23 @@ async def analyze(req: AnalyzeRequest):
             detail=f"Timeframe '{raw_timeframe}' is not supported. Supported intervals: {sorted(list(SUPPORTED_TIMEFRAMES))}",
         )
 
-    # ── Fetch live data from Twelve Data ───────────────
+    # ── Fetch live & historical data via yfinance ──────
     data = get_full_analysis_data(pair, interval=norm_timeframe)
     if data is None:
         raise HTTPException(
             status_code=502,
-            detail="Unable to retrieve market data from Twelve Data",
+            detail="Unable to retrieve market data from yfinance",
         )
 
     current_price = data.get("current_price")
     ohlc = data.get("ohlc", [])
     indicators = data.get("indicators", {})
+    enriched_df = data.get("enriched_df")
 
     if current_price is None or not ohlc:
         raise HTTPException(
             status_code=502,
-            detail="Unable to retrieve market data from Twelve Data",
+            detail="Unable to retrieve market data from yfinance",
         )
 
     rsi = indicators.get("rsi")
@@ -97,38 +99,41 @@ async def analyze(req: AnalyzeRequest):
     if rsi is None or macd is None or macd_signal is None or ema_20 is None:
         raise HTTPException(
             status_code=502,
-            detail="Unable to retrieve technical indicators from Twelve Data",
+            detail="Unable to compute technical indicators from market data",
         )
 
-    # ── Conceptually separate live price vs last candle close ──
-    # ohlc[-1] is the newest candle (ascending chronological order preserved)
-    last_candle_close = ohlc[-1].get("close", current_price)
+    if enriched_df is None or enriched_df.empty:
+        enriched_df = compute_indicators_df(pd.DataFrame(ohlc))
 
-    # ── Calculate data age in seconds ──────────────────
+    last_candle_close = float(ohlc[-1].get("close", current_price))
+
+    # ── True UTC data age in seconds ───────────────────
     data_age_seconds = 0
     try:
         last_dt_raw = ohlc[-1].get("datetime")
         if last_dt_raw:
-            last_dt = pd.to_datetime(last_dt_raw)
-            if last_dt.tzinfo is None:
-                last_dt = last_dt.tz_localize(timezone.utc)
+            last_dt = pd.to_datetime(last_dt_raw, utc=True)
             now_utc = datetime.now(timezone.utc)
             data_age_seconds = max(0, int((now_utc - last_dt).total_seconds()))
     except Exception:
         data_age_seconds = 0
 
-    # ── Standard True Range (ATR) calculation ──────────
+    # ── ATR calculation ────────────────────────────────
     atr_val = data.get("atr")
     if atr_val is None or atr_val <= 0:
         atr_val = calculate_atr(ohlc, period=14)
 
-    # ── Shared Rule-based signal evaluation ────────────
+    # ── LightGBM ML inference ──────────────────────────
+    ml_win_prob = float(predict_setup_probability(enriched_df.iloc[-1]))
+
+    # ── Hybrid ML + Structural signal evaluation ───────
     sig_eval = evaluate_signal(
         rsi=rsi,
         macd=macd,
         macd_signal=macd_signal,
         close=last_candle_close,
         ema_20=ema_20,
+        ml_win_prob=ml_win_prob,
     )
 
     signal = sig_eval["signal"]
@@ -153,6 +158,7 @@ async def analyze(req: AnalyzeRequest):
         "signal": signal,
         "confidence": confidence,
         "confidence_pct": round(confidence_pct, 1),
+        "ml_win_probability": round(ml_win_prob * 100.0, 1),
         "entry_price": entry_price,
         "stop_loss": stop_loss,
         "take_profit": take_profit,
@@ -167,13 +173,13 @@ async def analyze(req: AnalyzeRequest):
         },
         "current_price": current_price,
         "pair": pair,
-        "symbol": SUPPORTED_PAIRS[pair],
+        "symbol": PAIR_DISPLAY_SYMBOLS.get(pair, SUPPORTED_PAIRS[pair]),
         "timeframe": norm_timeframe,
         "analysis_depth": req.analysis_depth,
         "ohlc_count": len(ohlc),
         "data_age_seconds": data_age_seconds,
         "reasons": reasons,
-        "engine": "twelve_data_api",
+        "engine": "lightgbm_yfinance",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -184,7 +190,7 @@ async def analyze(req: AnalyzeRequest):
 @router.post("/image")
 async def predict_image(req: ImageRequest):
     """Analyse a chart image via pixel colour analysis (green vs red
-    candle ratio) and optionally enrich with live Twelve Data price."""
+    candle ratio) and optionally enrich with live yfinance price."""
 
     try:
         # ── Decode the image ───────────────────────────
@@ -205,7 +211,6 @@ async def predict_image(req: ImageRequest):
             img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
             width, height = img.size
 
-            # Sample every 4th pixel for performance
             step = max(1, min(width, height) // 100)
             for x in range(0, width, step):
                 for y in range(0, height, step):
@@ -216,7 +221,6 @@ async def predict_image(req: ImageRequest):
                     elif r > g and r > b and r > 80:
                         red_count += 1
         except ImportError:
-            # Pillow not available — fallback to size-based heuristic
             size = len(img_bytes)
             green_count = size % 100
             red_count = (size // 3) % 100

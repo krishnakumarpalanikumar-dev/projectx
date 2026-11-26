@@ -1,25 +1,23 @@
 """
-TradeVision AI — Twelve Data API Integration
-=============================================
-Authoritative market data collector powered by Twelve Data API.
-Provides live prices, historical OHLCV data, technical indicators,
-and standard True Range (ATR) volatility calculations for forex and crypto.
+TradeVision AI — yfinance Market Data Collector
+================================================
+Zero-cost market data collector powered by Yahoo Finance (`yfinance`).
+Supports Forex, Gold, Crypto, and major US Stocks with automatic lookback
+clamping, 4h resampling from 1h bars, UTC timestamp normalization, and an
+in-memory TTL cache.
 """
 
 import os
-import json
+import math
+import time
 import logging
 from datetime import datetime, timezone
+from typing import Dict, Tuple, Optional
 
-import requests
 import pandas as pd
-from dotenv import load_dotenv
+import yfinance as yf
 
-# ── Load environment variables ──────────────────────────
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", "backend", ".env"))
-
-API_KEY = os.getenv("TWELVE_DATA_API_KEY")
-BASE_URL = "https://api.twelvedata.com"
+from indicators import compute_indicators_df, get_latest_indicators
 
 # ── Logging ─────────────────────────────────────────────
 logging.basicConfig(
@@ -28,63 +26,99 @@ logging.basicConfig(
 )
 logger = logging.getLogger("data_collector")
 
-# ── Supported trading pairs ─────────────────────────────
-SUPPORTED_PAIRS = {
+# ── Supported trading pairs → Yahoo Finance tickers ─────
+SUPPORTED_PAIRS: Dict[str, str] = {
+    "EURUSD": "EURUSD=X",
+    "XAUUSD": "GC=F",
+    "GBPUSD": "GBPUSD=X",
+    "USDJPY": "USDJPY=X",
+    "AUDUSD": "AUDUSD=X",
+    "BTCUSDT": "BTC-USD",
+    "AAPL": "AAPL",
+    "NVDA": "NVDA",
+    "TSLA": "TSLA",
+    "MSFT": "MSFT",
+    "AMZN": "AMZN",
+    "GOOGL": "GOOGL",
+}
+
+# Clean UI display symbols
+PAIR_DISPLAY_SYMBOLS: Dict[str, str] = {
     "EURUSD": "EUR/USD",
     "XAUUSD": "XAU/USD",
     "GBPUSD": "GBP/USD",
     "USDJPY": "USD/JPY",
     "AUDUSD": "AUD/USD",
     "BTCUSDT": "BTC/USDT",
+    "AAPL": "AAPL",
+    "NVDA": "NVDA",
+    "TSLA": "TSLA",
+    "MSFT": "MSFT",
+    "AMZN": "AMZN",
+    "GOOGL": "GOOGL",
 }
 
-# ── Supported candle intervals ──────────────────────────
+# ── Supported timeframes ────────────────────────────────
 SUPPORTED_TIMEFRAMES = {
-    "1min",
-    "5min",
-    "15min",
-    "30min",
-    "45min",
+    "1m",
+    "5m",
+    "15m",
+    "30m",
     "1h",
-    "2h",
     "4h",
-    "1day",
-    "1week",
-    "1month",
+    "1d",
+    "1wk",
+    "1mo",
 }
 
-# Common shorthand mappings from UI to Twelve Data intervals
-TIMEFRAME_MAP = {
-    "1m": "1min",
-    "1min": "1min",
-    "5m": "5min",
-    "5min": "5min",
-    "15m": "15min",
-    "15min": "15min",
-    "30m": "30min",
-    "30min": "30min",
-    "45m": "45min",
-    "45min": "45min",
+# Map UI / legacy Twelve Data timeframe strings to canonical normalized intervals
+TIMEFRAME_MAP: Dict[str, str] = {
+    "1m": "1m",
+    "1min": "1m",
+    "5m": "5m",
+    "5min": "5m",
+    "15m": "15m",
+    "15min": "15m",
+    "30m": "30m",
+    "30min": "30m",
     "1h": "1h",
-    "2h": "2h",
     "4h": "4h",
-    "1d": "1day",
-    "1day": "1day",
-    "1w": "1week",
-    "1week": "1week",
-    "1M": "1month",
-    "1month": "1month",
+    "1d": "1d",
+    "1day": "1d",
+    "1w": "1wk",
+    "1wk": "1wk",
+    "1week": "1wk",
+    "1M": "1mo",
+    "1mo": "1mo",
+    "1month": "1mo",
 }
+
+# Canonical interval -> yfinance download interval (4h is resampled from 1h)
+YF_INTERVAL_MAP: Dict[str, str] = {
+    "1m": "1m",
+    "5m": "5m",
+    "15m": "15m",
+    "30m": "30m",
+    "1h": "1h",
+    "4h": "1h",
+    "1d": "1d",
+    "1wk": "1wk",
+    "1mo": "1mo",
+}
+
+# ── In-memory TTL Caches ────────────────────────────────
+PRICE_CACHE_TTL_SECONDS = 30.0
+OHLC_CACHE_TTL_SECONDS = 60.0
+
+_PRICE_CACHE: Dict[str, Tuple[float, float]] = {}
+_OHLC_CACHE: Dict[Tuple[str, str, str], Tuple[float, pd.DataFrame]] = {}
 
 
 def normalize_timeframe(interval: str | None) -> str | None:
     """Normalize and validate a timeframe interval.
 
-    Args:
-        interval: User or query string interval (e.g. "1h", "15m", "1day").
-
-    Returns:
-        Canonical Twelve Data interval string, or None if invalid.
+    Handles both UI shorthands (e.g. '15m', '1d', '1M') and legacy strings
+    (e.g. '15min', '1day', '1month'). Note '1M' (month) vs '1m' (minute).
     """
     if not interval:
         return "1h"
@@ -103,101 +137,205 @@ def normalize_timeframe(interval: str | None) -> str | None:
     return None
 
 
-def check_api_response(data: dict, endpoint_name: str) -> tuple[bool, str]:
-    """Inspect Twelve Data JSON response for error codes or status fields.
+def _select_valid_period(norm_interval: str, outputsize: int, period: Optional[str] = None) -> str:
+    """Compute a Yahoo Finance-compliant `period` clamped to interval limits.
 
-    Twelve Data can return HTTP 200 with an error body such as:
-      {"code": 429, "message": "...", "status": "error"}
-    Never logs or exposes the API key.
-
-    Returns:
-        (is_error, error_message)
+    Yahoo Finance limits:
+      - 1m: max 7d
+      - 5m, 15m, 30m: max 60d
+      - 1h (and 4h resampled from 1h): max 730d
+      - 1d, 1wk, 1mo: up to max
     """
-    if not isinstance(data, dict):
-        return True, f"Non-dict response from {endpoint_name}"
+    if period:
+        # Clamp explicit period strings if they exceed Yahoo limits
+        if norm_interval == "1m" and period not in ("1d", "2d", "3d", "4d", "5d", "6d", "7d"):
+            return "7d"
+        if norm_interval in ("5m", "15m", "30m"):
+            if period.endswith("d"):
+                try:
+                    d_val = int(period[:-1])
+                    return f"{min(60, max(1, d_val))}d"
+                except ValueError:
+                    return "60d"
+            if period in ("730d", "1y", "2y", "5y", "10y", "max"):
+                return "60d"
+        if norm_interval in ("1h", "4h"):
+            if period.endswith("d"):
+                try:
+                    d_val = int(period[:-1])
+                    return f"{min(730, max(1, d_val))}d"
+                except ValueError:
+                    return "730d"
+            if period in ("5y", "10y", "max"):
+                return "730d"
+        return period
 
-    if data.get("status") == "error":
-        msg = str(data.get("message", "Unknown error from Twelve Data"))
-        code = data.get("code", "")
-        if API_KEY and API_KEY in msg:
-            msg = msg.replace(API_KEY, "***")
-        return True, f"Twelve Data API error ({code}): {msg}"
+    n = max(1, int(outputsize or 500))
 
-    if "code" in data and isinstance(data["code"], int) and data["code"] >= 400:
-        msg = str(data.get("message", "API error"))
-        if API_KEY and API_KEY in msg:
-            msg = msg.replace(API_KEY, "***")
-        return True, f"Twelve Data API error ({data['code']}): {msg}"
+    if norm_interval == "1m":
+        days = min(7, max(2, math.ceil(n / 390) + 2))
+        return f"{days}d"
+    if norm_interval == "5m":
+        days = min(60, max(5, math.ceil(n / 78) + 4))
+        return f"{days}d"
+    if norm_interval == "15m":
+        days = min(60, max(7, math.ceil(n / 26) + 5))
+        return f"{days}d"
+    if norm_interval == "30m":
+        days = min(60, max(10, math.ceil(n / 13) + 6))
+        return f"{days}d"
+    if norm_interval in ("1h", "4h"):
+        eff_bars = n * 4 if norm_interval == "4h" else n
+        days = min(730, max(30, math.ceil(eff_bars / 16) + 10))
+        return f"{days}d"
+    if norm_interval == "1d":
+        if n <= 250:
+            return "2y"
+        if n <= 1250:
+            return "5y"
+        return "max"
 
-    return False, ""
+    return "max"
+
+
+def _standardize_yf_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
+    """Flatten MultiIndex columns, standardize names, normalize UTC datetime, and sort ascending."""
+    if raw_df is None or raw_df.empty:
+        return pd.DataFrame()
+
+    df = raw_df.copy()
+
+    # Flatten MultiIndex columns if present (common in newer yfinance versions)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [
+            col[0] if isinstance(col, tuple) else col for col in df.columns
+        ]
+
+    df = df.reset_index()
+
+    # Standardize all column names to lowercase
+    df.columns = [str(c).strip().lower() for c in df.columns]
+
+    # Normalize timestamp column name ('date', 'datetime', or 'index')
+    if "datetime" not in df.columns:
+        if "date" in df.columns:
+            df = df.rename(columns={"date": "datetime"})
+        elif "index" in df.columns:
+            df = df.rename(columns={"index": "datetime"})
+        else:
+            # Fallback to first column
+            df = df.rename(columns={df.columns[0]: "datetime"})
+
+    if "volume" not in df.columns:
+        df["volume"] = 0.0
+
+    required_cols = ["datetime", "open", "high", "low", "close", "volume"]
+    for col in ["open", "high", "low", "close"]:
+        if col not in df.columns:
+            return pd.DataFrame()
+
+    df = df[required_cols].copy()
+
+    for col in ["open", "high", "low", "close"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df["volume"] = pd.to_numeric(df["volume"], errors="coerce").fillna(0.0)
+    df["datetime"] = pd.to_datetime(df["datetime"], utc=True, errors="coerce")
+
+    df = df.dropna(subset=["datetime", "open", "high", "low", "close"])
+    df = df.sort_values("datetime", ascending=True).drop_duplicates(subset=["datetime"]).reset_index(drop=True)
+    return df
+
+
+def _resample_4h(df_1h: pd.DataFrame) -> pd.DataFrame:
+    """Resample ascending UTC 1h OHLCV candles cleanly into 4h candles."""
+    if df_1h is None or df_1h.empty:
+        return pd.DataFrame()
+
+    temp = df_1h.copy().set_index("datetime")
+    agg = (
+        temp.resample("4h")
+        .agg(
+            {
+                "open": "first",
+                "high": "max",
+                "low": "min",
+                "close": "last",
+                "volume": "sum",
+            }
+        )
+        .dropna(subset=["open", "high", "low", "close"])
+        .reset_index()
+    )
+    return agg
 
 
 # ─────────────────────────────────────────────────────────
-# Function 1 — Get current price
+# Function 1 — Get current price (30s TTL cache)
 # ─────────────────────────────────────────────────────────
 def get_current_price(pair: str) -> float | None:
-    """Fetch the latest real-time price for a given pair.
-
-    Args:
-        pair: Key from SUPPORTED_PAIRS (e.g. "EURUSD").
-
-    Returns:
-        Price as float, or None on failure.
-    """
-    symbol = SUPPORTED_PAIRS.get(pair.upper())
-    if not symbol:
+    """Fetch the latest price for a supported pair via yfinance (cached 30s)."""
+    pair_u = pair.upper()
+    ticker_sym = SUPPORTED_PAIRS.get(pair_u)
+    if not ticker_sym:
         logger.error(f"Unsupported pair: {pair}")
         return None
 
+    now_mono = time.monotonic()
+    cached = _PRICE_CACHE.get(pair_u)
+    if cached and (now_mono - cached[0]) < PRICE_CACHE_TTL_SECONDS:
+        return cached[1]
+
     try:
-        resp = requests.get(
-            f"{BASE_URL}/price",
-            params={"symbol": symbol, "apikey": API_KEY},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        ticker = yf.Ticker(ticker_sym)
+        price: Optional[float] = None
 
-        is_error, error_msg = check_api_response(data, f"/price for {pair}")
-        if is_error:
-            logger.error(f"API error fetching price for {pair}: {error_msg}")
+        # Primary: fast_info lastPrice
+        try:
+            fast_info = ticker.fast_info
+            lp = fast_info.get("lastPrice") if hasattr(fast_info, "get") else getattr(fast_info, "last_price", None)
+            if lp is not None and not pd.isna(lp) and float(lp) > 0:
+                price = float(lp)
+        except Exception:
+            price = None
+
+        # Fallback: latest 1m / 1h bar close
+        if price is None:
+            hist = ticker.history(period="5d", interval="1h", auto_adjust=False)
+            std = _standardize_yf_dataframe(hist)
+            if not std.empty:
+                price = float(std["close"].iloc[-1])
+
+        if price is None or math.isnan(price):
+            logger.error(f"No live price available via yfinance for {pair_u} ({ticker_sym})")
             return None
 
-        if "price" not in data:
-            logger.error(f"No price field in response for {pair}")
-            return None
-
-        price = float(data["price"])
-        logger.info(f"Current price for {pair} ({symbol}): {price}")
+        _PRICE_CACHE[pair_u] = (now_mono, price)
+        logger.info(f"Current price for {pair_u} ({ticker_sym}): {price}")
         return price
 
     except Exception as exc:
-        logger.error(f"Failed to fetch price for {pair}: {exc}")
+        logger.error(f"Failed to fetch yfinance price for {pair_u}: {exc}")
         return None
 
 
 # ─────────────────────────────────────────────────────────
-# Function 2 — Get OHLC history
+# Function 2 — Get OHLC history (60s TTL cache)
 # ─────────────────────────────────────────────────────────
 def get_ohlc_history(
     pair: str,
     interval: str = "1h",
     outputsize: int = 500,
+    period: Optional[str] = None,
 ) -> pd.DataFrame | None:
-    """Fetch historical OHLCV candle data.
+    """Fetch historical OHLCV candle data via yfinance.
 
-    Args:
-        pair: Key from SUPPORTED_PAIRS.
-        interval: Candle interval (e.g. "1min", "5min", "15min", "1h", "4h", "1day").
-        outputsize: Number of data points to return (max 5000).
-
-    Returns:
-        pandas DataFrame with columns [datetime, open, high, low, close, volume],
-        sorted ascending by datetime (ohlc[0] oldest, ohlc[-1] newest).
-        Returns None on failure.
+    Returns pandas DataFrame with columns [datetime, open, high, low, close, volume],
+    sorted ascending by UTC datetime (ohlc[0] oldest, ohlc[-1] newest).
     """
-    symbol = SUPPORTED_PAIRS.get(pair.upper())
-    if not symbol:
+    pair_u = pair.upper()
+    ticker_sym = SUPPORTED_PAIRS.get(pair_u)
+    if not ticker_sym:
         logger.error(f"Unsupported pair: {pair}")
         return None
 
@@ -206,53 +344,60 @@ def get_ohlc_history(
         logger.error(f"Unsupported interval '{interval}' for {pair}")
         return None
 
+    yf_interval = YF_INTERVAL_MAP[norm_interval]
+    effective_period = _select_valid_period(norm_interval, outputsize, period=period)
+
+    cache_key = (pair_u, norm_interval, effective_period)
+    now_mono = time.monotonic()
+    cached = _OHLC_CACHE.get(cache_key)
+    if cached and (now_mono - cached[0]) < OHLC_CACHE_TTL_SECONDS:
+        df_cached = cached[1]
+        if outputsize and len(df_cached) > outputsize:
+            return df_cached.tail(outputsize).reset_index(drop=True).copy()
+        return df_cached.copy()
+
     try:
-        resp = requests.get(
-            f"{BASE_URL}/time_series",
-            params={
-                "symbol": symbol,
-                "interval": norm_interval,
-                "outputsize": outputsize,
-                "apikey": API_KEY,
-            },
-            timeout=15,
+        ticker = yf.Ticker(ticker_sym)
+        raw_df = ticker.history(
+            period=effective_period,
+            interval=yf_interval,
+            auto_adjust=False,
+            prepost=False,
         )
-        resp.raise_for_status()
-        data = resp.json()
 
-        is_error, error_msg = check_api_response(data, f"/time_series for {pair}")
-        if is_error:
-            logger.error(f"API error fetching time_series for {pair}: {error_msg}")
+        df = _standardize_yf_dataframe(raw_df)
+        if df.empty:
+            # Secondary fallback via yf.download
+            raw_dl = yf.download(
+                ticker_sym,
+                period=effective_period,
+                interval=yf_interval,
+                auto_adjust=False,
+                progress=False,
+                threads=False,
+            )
+            df = _standardize_yf_dataframe(raw_dl)
+
+        if df.empty:
+            logger.error(f"Empty OHLC history from yfinance for {pair_u} ({ticker_sym}, {norm_interval}, {effective_period})")
             return None
 
-        if "values" not in data:
-            logger.error(f"No 'values' in time_series response for {pair}")
-            return None
+        if norm_interval == "4h":
+            df = _resample_4h(df)
+            if df.empty:
+                return None
 
-        df = pd.DataFrame(data["values"])
-
-        # Rename / sanitize columns
-        price_cols = ["open", "high", "low", "close"]
-        for col in price_cols:
-            if col in df.columns:
-                df[col] = df[col].astype(float)
-
-        if "volume" in df.columns:
-            df["volume"] = pd.to_numeric(df["volume"], errors="coerce").fillna(0)
-
-        # Ensure datetime column is proper
-        df["datetime"] = pd.to_datetime(df["datetime"])
-
-        # Crucial: Sort ascending by datetime so ohlc[0]=oldest, ohlc[-1]=newest
-        df = df.sort_values("datetime", ascending=True).reset_index(drop=True)
-
+        _OHLC_CACHE[cache_key] = (now_mono, df.copy())
         logger.info(
-            f"Fetched {len(df)} OHLC rows for {pair} ({symbol}), interval={norm_interval}"
+            f"Fetched {len(df)} OHLC rows via yfinance for {pair_u} ({ticker_sym}), interval={norm_interval}, period={effective_period}"
         )
+
+        if outputsize and len(df) > outputsize:
+            return df.tail(outputsize).reset_index(drop=True)
         return df
 
     except Exception as exc:
-        logger.error(f"Failed to fetch OHLC for {pair}: {exc}")
+        logger.error(f"Failed to fetch yfinance OHLC for {pair_u}: {exc}")
         return None
 
 
@@ -263,104 +408,26 @@ def get_technical_indicators(
     pair: str,
     interval: str = "1h",
 ) -> dict:
-    """Fetch RSI, MACD, and EMA-20 for a pair.
-
-    Args:
-        pair: Key from SUPPORTED_PAIRS.
-        interval: Candle interval.
-
-    Returns:
-        Dict with keys: rsi, macd, macd_signal, ema_20.
-        Values are None if the corresponding call failed or returned error.
-    """
-    symbol = SUPPORTED_PAIRS.get(pair.upper())
-    if not symbol:
-        logger.error(f"Unsupported pair: {pair}")
+    """Compute RSI, MACD, MACD signal, and EMA-20 from yfinance OHLC history."""
+    df = get_ohlc_history(pair, interval=interval, outputsize=200)
+    if df is None or df.empty:
         return {"rsi": None, "macd": None, "macd_signal": None, "ema_20": None}
 
-    norm_interval = normalize_timeframe(interval) or "1h"
-    result = {"rsi": None, "macd": None, "macd_signal": None, "ema_20": None}
-
-    # ── RSI ──────────────────────────────────────────────
-    try:
-        resp = requests.get(
-            f"{BASE_URL}/rsi",
-            params={"symbol": symbol, "interval": norm_interval, "apikey": API_KEY},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        is_error, error_msg = check_api_response(data, f"/rsi for {pair}")
-        if is_error:
-            logger.error(f"RSI API error for {pair}: {error_msg}")
-        elif "values" in data and len(data["values"]) > 0:
-            result["rsi"] = float(data["values"][0]["rsi"])
-            logger.info(f"RSI for {pair}: {result['rsi']}")
-    except Exception as exc:
-        logger.error(f"RSI fetch failed for {pair}: {exc}")
-
-    # ── MACD ─────────────────────────────────────────────
-    try:
-        resp = requests.get(
-            f"{BASE_URL}/macd",
-            params={"symbol": symbol, "interval": norm_interval, "apikey": API_KEY},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        is_error, error_msg = check_api_response(data, f"/macd for {pair}")
-        if is_error:
-            logger.error(f"MACD API error for {pair}: {error_msg}")
-        elif "values" in data and len(data["values"]) > 0:
-            latest = data["values"][0]
-            result["macd"] = float(latest.get("macd", 0))
-            result["macd_signal"] = float(latest.get("macd_signal", 0))
-            logger.info(
-                f"MACD for {pair}: macd={result['macd']}, signal={result['macd_signal']}"
-            )
-    except Exception as exc:
-        logger.error(f"MACD fetch failed for {pair}: {exc}")
-
-    # ── EMA-20 ───────────────────────────────────────────
-    try:
-        resp = requests.get(
-            f"{BASE_URL}/ema",
-            params={
-                "symbol": symbol,
-                "interval": norm_interval,
-                "time_period": 20,
-                "apikey": API_KEY,
-            },
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        is_error, error_msg = check_api_response(data, f"/ema for {pair}")
-        if is_error:
-            logger.error(f"EMA API error for {pair}: {error_msg}")
-        elif "values" in data and len(data["values"]) > 0:
-            result["ema_20"] = float(data["values"][0]["ema"])
-            logger.info(f"EMA-20 for {pair}: {result['ema_20']}")
-    except Exception as exc:
-        logger.error(f"EMA fetch failed for {pair}: {exc}")
-
-    return result
+    enriched = compute_indicators_df(df)
+    latest = get_latest_indicators(enriched)
+    return {
+        "rsi": latest["rsi"],
+        "macd": latest["macd"],
+        "macd_signal": latest["macd_signal"],
+        "ema_20": latest["ema_20"],
+    }
 
 
 # ─────────────────────────────────────────────────────────
 # Function 4 — Standard True Range (ATR) calculation
 # ─────────────────────────────────────────────────────────
 def calculate_atr(ohlc: list[dict], period: int = 14) -> float:
-    """Calculate standard Average True Range (ATR) from OHLC candles.
-    True Range = max(High - Low, |High - Close_prev|, |Low - Close_prev|).
-
-    Args:
-        ohlc: Chronologically ordered list of candle dicts (oldest to newest).
-        period: Number of periods for ATR (default 14).
-
-    Returns:
-        ATR as float. Returns 0.0 if insufficient candles.
-    """
+    """Calculate standard Average True Range (ATR) from OHLC candles."""
     if not ohlc or len(ohlc) < 2:
         if ohlc and len(ohlc) == 1:
             return float(ohlc[0]["high"] - ohlc[0]["low"])
@@ -391,21 +458,9 @@ def get_full_analysis_data(
     pair: str,
     interval: str = "1h",
 ) -> dict | None:
-    """Combine current price, OHLC history, and technical indicators
-    into a single analysis payload.
-
-    Args:
-        pair: Key from SUPPORTED_PAIRS.
-        interval: Candle interval.
-
-    Returns:
-        Dict with keys: pair, symbol, current_price, ohlc, indicators, atr, timestamp.
-        Returns None if any required market data component is missing (price, OHLC,
-        or indicators), preventing silent false analysis.
-    """
+    """Combine live price, OHLC history, indicators, and ML features in a single pass."""
     pair_upper = pair.upper()
-    symbol = SUPPORTED_PAIRS.get(pair_upper)
-    if not symbol:
+    if pair_upper not in SUPPORTED_PAIRS:
         logger.error(f"Unsupported pair: {pair}")
         return None
 
@@ -415,29 +470,25 @@ def get_full_analysis_data(
         return None
 
     try:
-        price = get_current_price(pair_upper)
-        ohlc_df = get_ohlc_history(pair_upper, interval=norm_interval)
-        indicators = get_technical_indicators(pair_upper, interval=norm_interval)
-
-        # Strict requirement: if price or OHLC failed, market data is unavailable
-        if price is None:
-            logger.error(f"Current price unavailable from Twelve Data for {pair_upper}")
-            return None
-
+        ohlc_df = get_ohlc_history(pair_upper, interval=norm_interval, outputsize=250)
         if ohlc_df is None or ohlc_df.empty:
-            logger.error(f"OHLC history unavailable from Twelve Data for {pair_upper}")
+            logger.error(f"OHLC history unavailable via yfinance for {pair_upper}")
             return None
 
-        # Check required indicators
+        price = get_current_price(pair_upper)
+        if price is None:
+            price = float(ohlc_df["close"].iloc[-1])
+
+        enriched_df = compute_indicators_df(ohlc_df)
+        latest_ind = get_latest_indicators(enriched_df)
+
         if (
-            indicators.get("rsi") is None
-            or indicators.get("macd") is None
-            or indicators.get("macd_signal") is None
-            or indicators.get("ema_20") is None
+            latest_ind.get("rsi") is None
+            or latest_ind.get("macd") is None
+            or latest_ind.get("macd_signal") is None
+            or latest_ind.get("ema_20") is None
         ):
-            logger.error(
-                f"One or more indicators unavailable from Twelve Data for {pair_upper}: {indicators}"
-            )
+            logger.error(f"Indicators unavailable for {pair_upper}: {latest_ind}")
             return None
 
         # Last 50 rows as list of dicts (chronological ascending: [0]=oldest, [-1]=newest)
@@ -445,21 +496,27 @@ def get_full_analysis_data(
         ohlc_tail["datetime"] = ohlc_tail["datetime"].astype(str)
         ohlc_records = ohlc_tail.to_dict(orient="records")
 
-        # Calculate standard 14-period True Range ATR
-        atr_val = calculate_atr(ohlc_records, period=14)
+        atr_val = latest_ind.get("atr")
+        if not atr_val or atr_val <= 0:
+            atr_val = calculate_atr(ohlc_records, period=14)
 
-        analysis = {
+        display_symbol = PAIR_DISPLAY_SYMBOLS.get(pair_upper, SUPPORTED_PAIRS[pair_upper])
+
+        return {
             "pair": pair_upper,
-            "symbol": symbol,
-            "current_price": price,
+            "symbol": display_symbol,
+            "current_price": round(float(price), 6),
             "ohlc": ohlc_records,
-            "indicators": indicators,
-            "atr": atr_val,
+            "enriched_df": enriched_df,
+            "indicators": {
+                "rsi": latest_ind["rsi"],
+                "macd": latest_ind["macd"],
+                "macd_signal": latest_ind["macd_signal"],
+                "ema_20": latest_ind["ema_20"],
+            },
+            "atr": float(atr_val),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-
-        logger.info(f"Full analysis assembled for {pair_upper} with Twelve Data data")
-        return analysis
 
     except Exception as exc:
         logger.error(f"Unexpected error in get_full_analysis_data for {pair_upper}: {exc}")
@@ -473,15 +530,7 @@ def save_data_to_csv(
     pair: str,
     interval: str = "1h",
 ) -> str | None:
-    """Download OHLC data and persist it as a CSV file.
-
-    Args:
-        pair: Key from SUPPORTED_PAIRS.
-        interval: Candle interval.
-
-    Returns:
-        Absolute file path on success, None on failure.
-    """
+    """Download OHLC data via yfinance and persist it as a CSV file."""
     df = get_ohlc_history(pair, interval=interval)
     if df is None or df.empty:
         logger.error(f"No data to save for {pair}")
@@ -504,34 +553,11 @@ def save_data_to_csv(
         return None
 
 
-# ─────────────────────────────────────────────────────────
-# CLI quick-test
-# ─────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=" * 60)
-    print("TradeVision AI — Twelve Data Collector Test")
+    print("TradeVision AI — yfinance Collector Test")
     print("=" * 60)
-
-    test_pair = "EURUSD"
-
-    print(f"\n1) Current price for {test_pair}:")
-    p = get_current_price(test_pair)
-    print(f"   → {p}")
-
-    print(f"\n2) OHLC history for {test_pair} (last 5 rows):")
-    ohlc = get_ohlc_history(test_pair, outputsize=10)
-    if ohlc is not None:
-        print(ohlc.tail().to_string(index=False))
-
-    print(f"\n3) Technical indicators for {test_pair}:")
-    ind = get_technical_indicators(test_pair)
-    print(f"   → {json.dumps(ind, indent=2)}")
-
-    print(f"\n4) Full analysis for {test_pair}:")
-    full = get_full_analysis_data(test_pair)
-    if full:
-        print(f"   Price : {full['current_price']}")
-        print(f"   OHLC  : {len(full['ohlc'])} rows")
-        print(f"   RSI   : {full['indicators']['rsi']}")
-        print(f"   ATR   : {full.get('atr')}")
-        print(f"   Time  : {full['timestamp']}")
+    for test_pair in ["EURUSD", "BTCUSDT", "AAPL"]:
+        p = get_current_price(test_pair)
+        df = get_ohlc_history(test_pair, interval="1h", outputsize=50)
+        print(f"{test_pair}: price={p}, rows={len(df) if df is not None else 0}")
